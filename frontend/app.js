@@ -91,9 +91,26 @@ jumpButton.addEventListener("click", smoothToBottom);
 
 /* ---------- Sessão ---------- */
 
-function showLogin() {
+// Na primeira execução (sem senha definida, acessando do próprio PC) a tela de
+// entrada vira "criar senha"; em qualquer outro caso é o login normal.
+let setupMode = false;
+let minPasswordLength = 12;
+
+async function showLogin() {
   stopGeneration();
   chatView.hidden = true;
+  const status = await fetch("/api/status").then((r) => r.json()).catch(() => ({}));
+  setupMode = status.setup === true;
+  minPasswordLength = status.min_password_length || minPasswordLength;
+  $("login-hint").textContent = setupMode
+    ? `Primeiro acesso: crie a senha da Distopic (mínimo ${minPasswordLength} caracteres).`
+    : "IA local · acesso restrito";
+  $("password").placeholder = setupMode ? "Nova senha" : "Senha";
+  $("password").autocomplete = setupMode ? "new-password" : "current-password";
+  $("password2").hidden = !setupMode;
+  $("password2").required = setupMode;
+  $("login-submit").textContent = setupMode ? "Criar senha e entrar" : "Entrar";
+  $("login-error").textContent = "";
   loginView.hidden = false;
   $("password").focus();
 }
@@ -117,11 +134,23 @@ $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const errorEl = $("login-error");
   errorEl.textContent = "";
-  const response = await jsonRequest("/api/login", { password: $("password").value });
+  const password = $("password").value;
+  if (setupMode) {
+    if (password.length < minPasswordLength) {
+      errorEl.textContent = `Use pelo menos ${minPasswordLength} caracteres.`;
+      return;
+    }
+    if (password !== $("password2").value) {
+      errorEl.textContent = "As senhas não conferem.";
+      return;
+    }
+  }
+  const response = await jsonRequest(setupMode ? "/api/setup" : "/api/login", { password });
   $("password").value = "";
+  $("password2").value = "";
   if (response.ok) return checkSession();
   const data = await response.json().catch(() => ({}));
-  errorEl.textContent = typeof data.detail === "string" ? data.detail : "Falha no login";
+  errorEl.textContent = typeof data.detail === "string" ? data.detail : "Não foi possível entrar";
 });
 
 $("logout").addEventListener("click", async () => {

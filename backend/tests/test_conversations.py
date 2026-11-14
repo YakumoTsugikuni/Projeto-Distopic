@@ -224,39 +224,55 @@ class TextToolCallTest(unittest.TestCase):
         self.assertEqual([e.get("text") for e in events if e["type"] == "token"], ['{"cor": "vermelho"}'])
 
 
-class DesktopLoginTest(unittest.TestCase):
-    def test_token_is_single_use(self):
+class FirstPasswordTest(unittest.TestCase):
+    """Primeira execução: a senha é criada pela interface, só a partir do próprio PC."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
         from app import auth
 
-        auth._desktop_token = "segredo-do-app"
-        self.assertFalse(auth.consume_desktop_token("errado"))
-        self.assertFalse(auth.consume_desktop_token(""))
-        self.assertTrue(auth.consume_desktop_token("segredo-do-app"))
-        self.assertFalse(auth.consume_desktop_token("segredo-do-app"))
-
-    def test_route_rejects_proxied_and_wrong_token(self):
-        from fastapi.testclient import TestClient
-        from app import auth
-        from app.main import app
-
-        auth._desktop_token = "segredo-do-app"
+        self.auth = auth
+        self.saved = (auth._password_hash, auth.ENV_FILE)
+        auth._password_hash = ""  # como em uma instalação nova
+        auth.ENV_FILE = Path(tempfile.mkdtemp(prefix="distopic_test_env_")) / "sub" / ".env"
         auth.throttle.reset()
         warnings.simplefilter("ignore")
-        with TestClient(app, client=("127.0.0.1", 50000), follow_redirects=False) as c:
-            # Via Cloudflare Tunnel: chega por localhost, mas com cabeçalho de proxy.
-            proxied = c.get("/api/desktop-login?token=segredo-do-app", headers={"CF-Connecting-IP": "203.0.113.9"})
-            self.assertEqual(proxied.status_code, 403)
-            self.assertEqual(c.get("/api/desktop-login?token=errado").status_code, 403)
-            self.assertEqual(c.get("/api/me").status_code, 401)
-            ok = c.get("/api/desktop-login?token=segredo-do-app")
-            self.assertEqual(ok.status_code, 303)
-            self.assertEqual(c.get("/api/me").status_code, 200)
-            self.assertEqual(c.get("/api/desktop-login?token=segredo-do-app").status_code, 403)
+
+    def tearDown(self):
+        self.auth._password_hash, self.auth.ENV_FILE = self.saved
+        self.auth.throttle.reset()
+
+    def test_setup_flow(self):
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        new = "uma-senha-bem-longa"
         with TestClient(app, client=("192.168.0.50", 50000)) as lan:
-            auth._desktop_token = "segredo-do-app"
-            self.assertEqual(lan.get("/api/desktop-login?token=segredo-do-app").status_code, 403)
-        auth._desktop_token = ""
-        auth.throttle.reset()
+            self.assertFalse(lan.get("/api/status").json()["setup"])
+            self.assertEqual(lan.post("/api/setup", json={"password": new}).status_code, 403)
+        with TestClient(app, client=("127.0.0.1", 50000)) as c:
+            # Via Cloudflare Tunnel: chega por localhost, mas com cabeçalho de proxy.
+            tunnel = {"CF-Connecting-IP": "203.0.113.9"}
+            self.assertFalse(c.get("/api/status", headers=tunnel).json()["setup"])
+            self.assertEqual(c.post("/api/setup", json={"password": new}, headers=tunnel).status_code, 403)
+
+            self.assertTrue(c.get("/api/status").json()["setup"])
+            self.assertEqual(c.post("/api/login", json={"password": new}).status_code, 401)  # ainda não existe
+            self.assertEqual(c.post("/api/setup", json={"password": "curta"}).status_code, 422)
+            self.assertEqual(c.post("/api/setup", json={"password": new}).status_code, 200)
+            self.assertEqual(c.get("/api/me").status_code, 200)  # já entra logado
+
+            # Depois de definida, a senha não pode ser redefinida por esta rota.
+            self.assertFalse(c.get("/api/status").json()["setup"])
+            self.assertEqual(c.post("/api/setup", json={"password": "outra-senha-longa"}).status_code, 403)
+        with TestClient(app, client=("127.0.0.1", 50001)) as again:
+            self.assertEqual(again.get("/api/me").status_code, 401)
+            self.assertEqual(again.post("/api/login", json={"password": "errada-errada"}).status_code, 401)
+            self.assertEqual(again.post("/api/login", json={"password": new}).status_code, 200)
+        saved = self.auth.ENV_FILE.read_text(encoding="utf-8")
+        self.assertIn("DISTOPIC_PASSWORD_HASH=scrypt:", saved)
+        self.assertNotIn(new, saved)  # só o hash vai para o disco
 
 
 class ApiTest(unittest.TestCase):
