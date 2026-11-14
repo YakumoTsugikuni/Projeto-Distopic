@@ -1,0 +1,173 @@
+/* Tema: cinza neutro. Preto, branco e vermelho vêm da logo e aparecem só como detalhe.
+   Sem blur, sombras grandes ou animações pesadas: a GPU é do modelo. */
+:root {
+  --bg: #1b1c1e;
+  --surface: #242528;
+  --panel: #2d2e32;
+  --panel-user: #3a3b40;
+  --border: #3f4045;
+  --text: #e6e6e8;
+  --muted: #9a9ba1;
+  --red: #d4252f;
+  --red-hover: #e23a43;
+  --black: #0b0b0c;
+  --white: #ffffff;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); overflow: hidden; }
+
+.muted { color: var(--muted); font-size: 0.85rem; }
+.error { color: #ff8088; min-height: 1.2em; margin: 0; font-size: 0.9rem; }
+
+button {
+  background: var(--red);
+  color: var(--white);
+  border: 0;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+button:hover { background: var(--red-hover); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-weight: 400; }
+button.ghost:hover { color: var(--text); border-color: var(--muted); }
+button.icon { background: transparent; color: var(--muted); padding: 0.3rem 0.5rem; font-weight: 400; }
+button.icon:hover { color: var(--text); background: var(--border); }
+
+input, textarea {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font: inherit;
+  width: 100%;
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+
+/* Barras de rolagem finas, no tom do tema */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+/* ---------- Login ---------- */
+.login { height: 100%; display: grid; place-items: center; padding: 16px; }
+.login-card { width: min(340px, 100%); display: grid; gap: 0.8rem; text-align: center; }
+.login-card h1 { margin: 0; letter-spacing: 0.35em; font-size: 1.6rem; color: var(--white); }
+.login-card p { margin: 0; }
+.login-logo { justify-self: center; }
+
+/* ---------- Estrutura ---------- */
+.app { height: 100%; display: flex; }
+
+#sidebar {
+  width: 270px; flex: none; display: flex; flex-direction: column; gap: 0.6rem;
+  padding: 14px 12px; background: var(--surface); border-right: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; letter-spacing: 0.3em; color: var(--white); padding: 0.2rem 0.4rem 0.5rem; border-bottom: 2px solid var(--red); }
+
+#conversations { flex: 1; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.group { margin: 0.7rem 0 0.25rem; padding: 0 0.5rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.empty-list { padding: 0.6rem 0.5rem; color: var(--muted); font-size: 0.85rem; }
+
+.conv { display: flex; align-items: center; border-radius: 6px; border-left: 2px solid transparent; }
+.conv:hover { background: var(--panel); }
+.conv.active { background: var(--panel); border-left-color: var(--red); }
+.conv .open {
+  flex: 1; min-width: 0; text-align: left; background: transparent; color: var(--text); font-weight: 400;
+  padding: 0.45rem 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.conv .icon { font-size: 0.8rem; display: none; } /* ocultos não roubam espaço do título */
+.conv:hover .icon, .conv:focus-within .icon { display: inline-block; }
+.conv .delete.armed { background: var(--red); color: var(--white); }
+.conv input { padding: 0.35rem 0.5rem; }
+
+.chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat header {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.7rem 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.chat header h1 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#menu { display: none; font-size: 1.1rem; }
+
+.status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--muted); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.25; } }
+
+/* ---------- Mensagens ---------- */
+.scroll-wrap { flex: 1; min-height: 0; position: relative; }
+#messages {
+  height: 100%; overflow-y: auto;
+  /* A posição de leitura é controlada pelo app.js ao carregar mensagens antigas. */
+  overflow-anchor: none;
+  padding: 18px max(16px, calc((100% - 820px) / 2));
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+#messages > :first-child { margin-top: auto; } /* conversas curtas ficam junto ao campo de entrada */
+
+.msg { max-width: 85%; padding: 0.65rem 0.95rem; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.msg.user { align-self: flex-end; background: var(--panel-user); }
+.msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+.msg.error { align-self: flex-start; border: 1px solid var(--red); color: #ff8088; }
+.msg.pending::after { content: "● ● ●"; font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); animation: pulse 1s ease-in-out infinite; }
+.note { align-self: flex-start; font-size: 0.8rem; color: var(--muted); }
+.welcome { align-self: center; margin: auto 0; color: var(--muted); text-align: center; }
+.welcome img { display: block; margin: 0 auto 0.8rem; opacity: 0.9; }
+
+.tool {
+  align-self: flex-start; max-width: 85%;
+  border: 1px dashed var(--border); border-radius: 8px;
+  padding: 0.45rem 0.8rem; font-size: 0.82rem; color: var(--muted);
+}
+.tool summary { cursor: pointer; overflow-wrap: anywhere; }
+.tool.failed summary { color: #ff8088; }
+.tool pre, .confirm pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: Consolas, monospace; font-size: 0.82rem; }
+.tool pre { margin: 0.5rem 0 0; }
+
+.confirm { align-self: stretch; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--red); border-radius: 8px; padding: 0.8rem 0.95rem; }
+.confirm strong { color: var(--white); }
+.confirm p { margin: 0.4rem 0; overflow-wrap: anywhere; }
+.confirm pre { margin: 0 0 0.7rem; padding: 0.6rem; max-height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.confirm-actions { display: flex; align-items: center; gap: 0.6rem; }
+.confirm.decided { opacity: 0.65; }
+
+#jump {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  background: var(--panel-user); color: var(--text); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.35rem 0.9rem; font-size: 0.82rem; font-weight: 400;
+}
+#jump:hover { background: var(--border); }
+
+#chat-form {
+  display: flex; align-items: flex-end; gap: 0.6rem;
+  padding: 12px max(16px, calc((100% - 820px) / 2)) 16px;
+  border-top: 1px solid var(--border);
+}
+#input { resize: none; max-height: 180px; }
+#stop { background: var(--panel-user); border: 1px solid var(--red); }
+
+/* ---------- Telas estreitas: a barra lateral vira gaveta ---------- */
+@media (max-width: 760px) {
+  #menu { display: inline-block; }
+  #model { display: none; }
+  #sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 2; width: min(300px, 85vw);
+    transform: translateX(-100%); transition: transform 150ms ease-out;
+  }
+  #sidebar.open { transform: none; }
+  #scrim { position: fixed; inset: 0; z-index: 1; background: rgba(0, 0, 0, 0.5); }
+  .conv .icon { display: inline-block; }
+  .msg, .tool { max-width: 94%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

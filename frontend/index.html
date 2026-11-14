@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Distopic</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="login-view" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <img class="login-logo" src="assets/logo.png" alt="" width="112" height="112">
+      <h1>DISTOPIC</h1>
+      <p class="muted">IA local · acesso restrito</p>
+      <input id="password" type="password" placeholder="Senha" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </main>
+
+  <div id="chat-view" class="app" hidden>
+    <div id="scrim" hidden></div>
+
+    <aside id="sidebar">
+      <div class="brand"><img src="assets/logo.png" alt="" width="34" height="34">DISTOPIC</div>
+      <button id="new-chat" type="button" title="Ctrl+N">Nova conversa</button>
+      <input id="search" type="search" placeholder="Buscar conversas" title="Ctrl+K" autocomplete="off">
+      <nav id="conversations" aria-label="Conversas"></nav>
+      <button id="logout" class="ghost" type="button">Sair</button>
+    </aside>
+
+    <div class="chat">
+      <header>
+        <button id="menu" class="icon" type="button" aria-label="Abrir conversas">☰</button>
+        <h1 id="title">Nova conversa</h1>
+        <span id="status" class="status" hidden>gerando</span>
+        <span id="model" class="muted"></span>
+      </header>
+
+      <div class="scroll-wrap">
+        <section id="messages" aria-live="polite"></section>
+        <button id="jump" type="button" hidden>↓ Novas mensagens</button>
+      </div>
+
+      <form id="chat-form">
+        <textarea id="input" rows="1" placeholder="Mensagem (Enter envia, Shift+Enter quebra linha)" required></textarea>
+        <button id="send" type="submit">Enviar</button>
+        <button id="stop" type="button" title="Esc" hidden>Parar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# Só para gerar o instalador (build-desktop.ps1).
+pyinstaller>=6.10

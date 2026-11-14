@@ -1,0 +1,4 @@
+# A compilação gera alguns GB de arquivos temporários. Eles ficam fora da pasta
+# do projeto porque ela é sincronizada pelo OneDrive (lentidão e arquivos travados).
+[build]
+target-dir = "C:/Users/Guilh/AppData/Local/Distopic/build"
