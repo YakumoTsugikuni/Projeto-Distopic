@@ -9,9 +9,9 @@ chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection = chroma_client.get_or_create_collection(name="distopic_docs")
 
 def extract_text(flie_path: str) -> str:
-    ext = os.path.splitext(file_path)[1].lower()
+    ext = os.path.splitext(flie_path)[1].lower()
     if ext == ".pdf":
-        reader = PdfReader(file_path)
+        reader = PdfReader(flie_path)
         pages = [page.extract_text() or "" for page in reader.pages]
         return "\n".join(pages)
     else:
