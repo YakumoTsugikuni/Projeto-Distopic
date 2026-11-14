@@ -45,9 +45,11 @@ ollama pull qwen2.5-coder:7b
 ollama create distopic -f Modelfile
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m app.set_password
 .\.venv\Scripts\python.exe -m app
 ```
+
+A senha é criada na própria tela de entrada, no primeiro acesso feito deste PC
+(ou pelo terminal: `.\.venv\Scripts\python.exe -m app.set_password`).
 
 Abra http://localhost:8000. Depois de uma resposta, `ollama ps` deve mostrar `100% GPU`.
 
@@ -63,13 +65,26 @@ cargo run
 
 - A janela inicia o backend sozinha (não rode `python -m app` ao mesmo tempo: a porta 8000 fica ocupada)
   e o encerra ao fechar.
-- Não pede senha: a janela entra com um token de uso único gerado a cada abertura. O acesso por
-  navegador, rede local ou túnel continua exigindo a senha.
+- Pede a senha a cada abertura, como no navegador. No primeiro acesso (sem senha definida) a tela de
+  entrada pede para criar a senha; isso só é possível a partir do próprio PC, nunca pela rede ou túnel.
 - Log do backend: `%LOCALAPPDATA%\Distopic\backend.log`.
 - Os arquivos de compilação ficam em `%LOCALAPPDATA%\Distopic\build` (fora do OneDrive); o caminho está
   em `src-tauri/.cargo/config.toml`.
-- Estado atual: o executável usa o backend e a `.venv` desta pasta do projeto. O instalador
-  independente (backend empacotado) ainda não foi feito.
+- `cargo run` usa o backend e a `.venv` desta pasta do projeto.
+
+### Instalador
+
+Na raiz do projeto:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build-desktop.ps1
+```
+
+Gera o instalador em `%LOCALAPPDATA%\Distopic\build\release\bundle\nsis\`. O aplicativo instalado é
+independente da pasta do projeto e guarda a configuração (incluindo a senha, criada no primeiro
+acesso) em `%LOCALAPPDATA%\Distopic\.env` — ele **não** lê o `backend\.env`. A pasta de trabalho
+padrão dele é `%USERPROFILE%\Distopic`. Para trocar a senha depois:
+`distopic-backend.exe set-password` na pasta de instalação.
 
 ## Acesso remoto
 

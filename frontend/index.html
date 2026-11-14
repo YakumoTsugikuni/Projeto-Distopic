@@ -12,9 +12,10 @@
     <form id="login-form" class="login-card">
       <img class="login-logo" src="assets/logo.png" alt="" width="112" height="112">
       <h1>DISTOPIC</h1>
-      <p class="muted">IA local · acesso restrito</p>
+      <p id="login-hint" class="muted">IA local · acesso restrito</p>
       <input id="password" type="password" placeholder="Senha" autocomplete="current-password" required>
-      <button type="submit">Entrar</button>
+      <input id="password2" type="password" placeholder="Repita a senha" autocomplete="new-password" hidden>
+      <button id="login-submit" type="submit">Entrar</button>
       <p id="login-error" class="error" role="alert"></p>
     </form>
   </main>

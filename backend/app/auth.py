@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 import time
 
 from fastapi import HTTPException, Request, Response
 
-from .config import settings
+from .config import ENV_FILE, settings
 
 COOKIE_NAME = "distopic_session"
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 1
@@ -73,27 +72,49 @@ class LoginThrottle:
 throttle = LoginThrottle()
 
 
-# Token de uso único entregue pelo aplicativo desktop ao iniciar o backend.
-# Vem só da variável de ambiente do processo — nunca do .env nem do disco.
-_desktop_token = os.environ.get("DISTOPIC_DESKTOP_TOKEN", "")
-DESKTOP_SESSION_TTL = 30 * 24 * 3600  # a sessão morre de qualquer forma quando o app fecha
+MIN_PASSWORD_LENGTH = 12
+_PASSWORD_KEY = "DISTOPIC_PASSWORD_HASH"
+_password_hash = settings.password_hash
 
 
-def desktop_mode() -> bool:
-    return bool(os.environ.get("DISTOPIC_DESKTOP_TOKEN"))
+def password_configured() -> bool:
+    return bool(_password_hash)
 
 
-def consume_desktop_token(token: str) -> bool:
-    """Valida o token do aplicativo desktop e o invalida: só funciona uma vez."""
-    global _desktop_token
-    if not _desktop_token or not hmac.compare_digest(token.encode(), _desktop_token.encode()):
-        return False
-    _desktop_token = ""
-    return True
+def check_password(password: str) -> bool:
+    return verify_password(password, _password_hash)
 
 
-def create_session(request: Request, response: Response, ttl: int | None = None) -> None:
-    ttl = ttl or settings.session_ttl_seconds
+def store_password(password: str) -> None:
+    """Grava o hash (nunca a senha) no arquivo de configuração e passa a usá-lo."""
+    global _password_hash
+    hashed = hash_password(password)
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.is_file() else []
+    lines = [line for line in lines if not line.startswith(f"{_PASSWORD_KEY}=")]
+    lines.append(f"{_PASSWORD_KEY}={hashed}")
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _password_hash = hashed
+
+
+_PROXY_HEADERS = ("x-forwarded-for", "forwarded", "cf-connecting-ip", "cf-ray")
+
+
+def is_direct_local(request: Request) -> bool:
+    """Conexão feita neste próprio PC, sem intermediários.
+
+    O Cloudflare Tunnel também chega por 127.0.0.1, mas sempre com cabeçalhos
+    de proxy — por isso eles desqualificam a requisição.
+    """
+    return (
+        request.client is not None
+        and request.client.host in ("127.0.0.1", "::1")
+        and not any(header in request.headers for header in _PROXY_HEADERS)
+    )
+
+
+def create_session(request: Request, response: Response) -> None:
+    ttl = settings.session_ttl_seconds
     token = secrets.token_urlsafe(32)
     _sessions[token] = time.time() + ttl
     https = (

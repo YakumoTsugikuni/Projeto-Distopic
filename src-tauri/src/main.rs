@@ -76,14 +76,7 @@ fn start_backend(app: AppHandle, mut window: WebviewWindow, port: u16) {
         );
     }
 
-    // Token de uso único: a janela o troca por uma sessão, sem pedir senha.
-    // Existe só na memória deste processo e no ambiente do backend.
-    let token = match random_token() {
-        Ok(token) => token,
-        Err(error) => return fail(&window, format!("Falha ao gerar o token de sessão: {error}")),
-    };
-
-    match spawn_backend(port, &token) {
+    match spawn_backend(port) {
         Ok(child) => *app.state::<Backend>().0.lock().unwrap() = Some(child),
         Err(error) => return fail(&window, format!("Não foi possível iniciar o backend: {error}")),
     }
@@ -91,7 +84,8 @@ fn start_backend(app: AppHandle, mut window: WebviewWindow, port: u16) {
     let deadline = Instant::now() + STARTUP_TIMEOUT;
     while Instant::now() < deadline {
         if reachable() {
-            let url = format!("http://127.0.0.1:{port}/api/desktop-login?token={token}");
+            // A interface pede a senha (ou a criação dela, no primeiro acesso).
+            let url = format!("http://127.0.0.1:{port}/");
             if let Err(error) = window.navigate(url.parse().expect("URL local válida")) {
                 fail(&window, format!("Falha ao abrir a interface: {error}"));
             }
@@ -139,7 +133,7 @@ fn bundled_backend() -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
-fn spawn_backend(port: u16, token: &str) -> std::io::Result<Child> {
+fn spawn_backend(port: u16) -> std::io::Result<Child> {
     // Instalado: usa o backend empacotado. Em desenvolvimento: o Python da .venv do projeto.
     let mut command = match bundled_backend() {
         Some(exe) => Command::new(exe),
@@ -167,7 +161,6 @@ fn spawn_backend(port: u16, token: &str) -> std::io::Result<Child> {
 
     command
         .env("DISTOPIC_PORT", port.to_string())
-        .env("DISTOPIC_DESKTOP_TOKEN", token)
         // O backend se encerra sozinho quando este processo deixa de existir,
         // mesmo que o aplicativo trave ou seja finalizado à força.
         .env("DISTOPIC_PARENT_PID", std::process::id().to_string())
@@ -176,12 +169,6 @@ fn spawn_backend(port: u16, token: &str) -> std::io::Result<Child> {
         .stderr(stderr)
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-}
-
-fn random_token() -> Result<String, getrandom::Error> {
-    let mut bytes = [0u8; 32];
-    getrandom::getrandom(&mut bytes)?;
-    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
 /// Mostra o erro na tela de carregamento.

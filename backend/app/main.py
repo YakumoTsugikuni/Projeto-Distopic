@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import anyio
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -24,12 +24,8 @@ log = logging.getLogger("distopic")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # No aplicativo desktop a entrada é pelo token local; a senha só é exigida
-    # para o acesso por navegador, que sem ela fica simplesmente indisponível.
-    if not settings.password_hash and not auth.desktop_mode():
-        raise RuntimeError(
-            "Senha não configurada. Rode `python -m app.set_password` dentro de backend/."
-        )
+    # Sem senha definida o servidor sobe, mas nada é acessível: a única ação
+    # possível é criar a senha, e só a partir deste próprio PC (ver /api/setup).
     for root in settings.allowed_roots:
         root.mkdir(parents=True, exist_ok=True)
     storage.init()
@@ -91,7 +87,7 @@ class RenameBody(BaseModel):
 async def login(body: LoginBody, request: Request, response: Response):
     if auth.throttle.blocked():
         raise HTTPException(429, "Muitas tentativas. Aguarde alguns minutos.")
-    if not auth.verify_password(body.password, settings.password_hash):
+    if not auth.check_password(body.password):
         auth.throttle.record_failure()
         raise HTTPException(401, "Senha incorreta")
     auth.throttle.reset()
@@ -99,29 +95,30 @@ async def login(body: LoginBody, request: Request, response: Response):
     return {"ok": True}
 
 
-_PROXY_HEADERS = ("x-forwarded-for", "forwarded", "cf-connecting-ip", "cf-ray")
+class SetupBody(BaseModel):
+    password: str = Field(min_length=auth.MIN_PASSWORD_LENGTH, max_length=256)
 
 
-@app.get("/api/desktop-login")
-async def desktop_login(token: str, request: Request):
-    """Entrada sem senha do aplicativo desktop: troca o token de uso único por uma sessão.
+def _can_setup(request: Request) -> bool:
+    # Criar a primeira senha só é possível neste próprio PC: nunca pela rede
+    # local nem pelo túnel, senão o primeiro a chegar definiria a senha.
+    return not auth.password_configured() and auth.is_direct_local(request)
 
-    Só vale para conexão direta de 127.0.0.1. O Cloudflare Tunnel também chega
-    por localhost, mas sempre com cabeçalhos de proxy — esses são recusados.
-    """
-    direct_local = (
-        request.client is not None
-        and request.client.host in ("127.0.0.1", "::1")
-        and not any(header in request.headers for header in _PROXY_HEADERS)
-    )
-    if not direct_local or auth.throttle.blocked():
-        raise HTTPException(403, "Não permitido")
-    if not auth.consume_desktop_token(token):
-        auth.throttle.record_failure()
-        raise HTTPException(403, "Não permitido")
-    response = RedirectResponse("/", status_code=303)
-    auth.create_session(request, response, ttl=auth.DESKTOP_SESSION_TTL)
-    return response
+
+@app.get("/api/status")
+async def status(request: Request):
+    """Público: diz à tela de entrada se ela deve pedir a criação da senha."""
+    return {"setup": _can_setup(request), "min_password_length": auth.MIN_PASSWORD_LENGTH}
+
+
+@app.post("/api/setup")
+async def setup(body: SetupBody, request: Request, response: Response):
+    """Primeira execução: cria a senha de acesso e já inicia a sessão."""
+    if not _can_setup(request):
+        raise HTTPException(403, "A senha já foi definida ou este acesso não pode defini-la.")
+    await anyio.to_thread.run_sync(auth.store_password, body.password)
+    auth.create_session(request, response)
+    return {"ok": True}
 
 
 @app.post("/api/logout")

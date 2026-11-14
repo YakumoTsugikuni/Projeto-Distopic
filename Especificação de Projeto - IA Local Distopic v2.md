@@ -67,8 +67,8 @@ todas servidas pelo **mesmo backend**:
 
 ### 4.5 Persistência de conversas ✅ *(novo — seção 6; a interface de histórico ainda é provisória, ver seção 7)*
 ### 4.6 Aplicativo desktop 🔶 *(novo — seção 5)*
-- ✅ Janela Tauri, tela de carregamento, início/encerramento do backend, login local por token de uso
-  único, instância única, ícones. Verificado: `ollama ps` em `100% GPU` com o aplicativo aberto.
+- ✅ Janela Tauri, tela de carregamento, início/encerramento do backend, login por senha com criação
+  no primeiro acesso, instância única, ícones. Verificado: `ollama ps` em `100% GPU` com o aplicativo aberto.
 - ⬜ Instalador independente (backend empacotado com PyInstaller como sidecar + `tauri build`). Hoje o
   executável depende da pasta do projeto e da `.venv`.
 ### 4.7 Refinamentos de UI ✅ *(novo — seção 7; falta apenas a logo, seção 5.4)*
@@ -101,10 +101,12 @@ todas servidas pelo **mesmo backend**:
 - **Ollama não é empacotado.** Se não estiver rodando, a interface mostra um aviso claro com a instrução, sem travar.
 
 ### 5.2 Autenticação no desktop
-- O aplicativo local não pede senha. A cada inicialização o Tauri gera um token aleatório de uso único,
-  entrega-o ao backend por variável de ambiente e a janela o troca por um cookie de sessão normal.
-- O token vale apenas para conexões vindas de `127.0.0.1` e não é gravado em disco.
-- O login por senha continua obrigatório para navegador, rede local e túnel.
+- **Revisado a pedido do usuário:** o aplicativo pede a senha a cada abertura, igual ao navegador.
+  O login automático por token (versão anterior desta seção) foi removido.
+- **Primeiro acesso:** se não há senha definida, a tela de entrada vira "criar senha". Isso só é aceito
+  em conexão direta de `127.0.0.1` sem cabeçalhos de proxy — nunca pela rede local nem pelo túnel.
+- O aplicativo instalado guarda a senha (hash scrypt) em `%LOCALAPPDATA%\Distopic\.env`, separado do
+  `backend\.env` usado em desenvolvimento.
 
 ### 5.3 Uso de GPU pela janela
 - Sem efeitos que dependam de composição pesada: nada de `backdrop-filter`, desfoques, sombras grandes
