@@ -21,7 +21,7 @@ $data = @("index.html", "style.css", "app.js", "favicon.ico") | ForEach-Object {
 $data += "--add-data=$frontend\assets;frontend\assets"
 & $python -m PyInstaller --noconfirm --clean --onefile --console --name distopic-backend `
     --workpath "$work\work" --distpath "$work\dist" --specpath $work `
-    --collect-submodules uvicorn --hidden-import anyio._backends._asyncio `
+    --collect-submodules chromadb --collect-submodules uvicorn --hidden-import anyio._backends._asyncio `
     @data (Join-Path $backend "desktop_entry.py")
 if ($LASTEXITCODE) { throw "PyInstaller falhou" }
 
