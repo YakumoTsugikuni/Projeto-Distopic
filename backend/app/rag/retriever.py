@@ -1,25 +1,45 @@
-from .indexer import collection
-from .embedder import get_embedding
+"""Busca nos documentos de UMA conta. Não existe busca sem dono."""
+import anyio
 
-async def search_docs(query: str, top_k: int = 3) -> str:
-    if collection.count() == 0:
-        return ""
+from . import embedder
+from .indexer import SCOPE_LIBRARY, collection
 
-    query_emb = await get_embedding(query)
-    results = collection.query(
-        query_embeddings=[query_emb],
-        n_results=top_k
-    )
 
-    docs = results.get("documents", [[]])[0]
-    metas = results.get("metadatas", [[]])[0]
+async def search_docs(
+    query: str,
+    *,
+    owner_id: str,
+    conversation_id: str | None = None,
+    top_k: int = 3,
+) -> list[dict]:
+    """Trechos mais próximos da pergunta: [{"source": nome do arquivo, "text": trecho}].
 
-    if not docs:
-        return ""
+    Procura na Biblioteca de `owner_id` e, se `conversation_id` for dado, também
+    nos arquivos temporários daquela conversa. O filtro de dono é sempre
+    aplicado: vetores de outra conta, ou antigos e sem dono, nunca retornam.
+    """
+    if not owner_id:
+        raise ValueError("A busca exige o dono dos documentos.")
 
-    context_blocks = []
-    for doc, meta in zip(docs, metas):
-        source = meta.get("source", "desconhecido")
-        context_blocks.append(f"[Fonte: {source}]\n{doc}")
+    scope: dict = {"scope": SCOPE_LIBRARY}
+    if conversation_id:
+        scope = {"$or": [scope, {"conversation_id": conversation_id}]}
+    where = {"$and": [{"owner_id": owner_id}, scope]}
 
-    return "\n\n---\n\n".join(context_blocks)
+    query_emb = await embedder.get_embedding(query)
+
+    def run() -> dict:
+        return collection.query(query_embeddings=[query_emb], n_results=top_k, where=where)
+
+    results = await anyio.to_thread.run_sync(run)
+    docs = (results.get("documents") or [[]])[0]
+    metas = (results.get("metadatas") or [[]])[0]
+    return [
+        {"source": (meta or {}).get("source", "desconhecido"), "text": doc}
+        for doc, meta in zip(docs, metas)
+    ]
+
+
+def format_context(hits: list[dict]) -> str:
+    """Trechos com o nome do documento, para que a resposta possa citar a fonte."""
+    return "\n\n---\n\n".join(f"[Fonte: {hit['source']}]\n{hit['text']}" for hit in hits)

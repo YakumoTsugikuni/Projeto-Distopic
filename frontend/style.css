@@ -146,6 +146,48 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 }
 #jump:hover { background: var(--border); }
 
+/* ---------- Envio de documentos ---------- */
+.upload-status {
+  margin: 0 max(16px, calc((100% - 820px) / 2)); padding: 0.4rem 0.2rem;
+  font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere;
+}
+.upload-status.failed { color: #ff8088; }
+
+.attach { position: relative; flex: none; }
+#attach { padding: 0.6rem 0.85rem; font-size: 1.05rem; line-height: 1.2; }
+.attach-menu {
+  position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 3; width: min(320px, 80vw);
+  display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.attach-menu button {
+  display: flex; flex-direction: column; gap: 0.15rem; text-align: left;
+  background: transparent; color: var(--text); font-weight: 400; padding: 0.55rem 0.7rem; border-radius: 6px;
+}
+.attach-menu button:hover { background: var(--panel); }
+.attach-menu span { color: var(--muted); font-size: 0.8rem; }
+
+/* ---------- Painéis (documentos, conta) ---------- */
+dialog {
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 18px;
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog header { display: flex; align-items: center; margin-bottom: 0.4rem; }
+dialog h2 { flex: 1; margin: 0; font-size: 1.05rem; }
+dialog h3 { margin: 1.1rem 0 0.4rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+dialog p { margin: 0.3rem 0; }
+.rows { display: flex; flex-direction: column; gap: 2px; }
+.row { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0.5rem; border-radius: 6px; }
+.row:hover { background: var(--panel); }
+.row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .delete.armed { background: var(--red); color: var(--white); }
+.row-form { flex-wrap: wrap; }
+.row-form input { flex: 1; min-width: 160px; padding: 0.4rem 0.6rem; }
+.stack { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
+.stack p { min-height: 1.2em; }
+
 #chat-form {
   display: flex; align-items: flex-end; gap: 0.6rem;
   padding: 12px max(16px, calc((100% - 820px) / 2)) 16px;

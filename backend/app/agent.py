@@ -87,11 +87,17 @@ def _parse_text_tool_calls(content: str) -> list[dict]:
     return calls
 
 
-async def run(client: httpx.AsyncClient, history: list[dict]) -> AsyncIterator[dict]:
+async def run(
+    client: httpx.AsyncClient, history: list[dict], *, allow_tools: bool = True
+) -> AsyncIterator[dict]:
     """Produz eventos para o frontend:
-    token, tool_call, confirm_request, tool_result, truncated, done, error."""
+    token, tool_call, confirm_request, tool_result, truncated, done, error.
+
+    `allow_tools=False` desliga o acesso aos arquivos do PC (contas não administradoras).
+    """
     messages = trim_history(history)
-    schemas = tools.ollama_schemas()
+    # Sem permissão, o modelo nem fica sabendo que as ferramentas existem.
+    schemas = tools.ollama_schemas() if allow_tools else []
 
     for _ in range(MAX_STEPS):
         content = ""
@@ -112,8 +118,10 @@ async def run(client: httpx.AsyncClient, history: list[dict]) -> AsyncIterator[d
             calls.extend(message.get("tool_calls") or [])
             truncated = chunk.get("done_reason") == "length"
 
+        if not allow_tools:
+            calls = []  # qualquer chamada que ainda assim apareça é descartada
         if not calls and not streaming and content:
-            calls = _parse_text_tool_calls(content)
+            calls = _parse_text_tool_calls(content) if allow_tools else []
             if calls:
                 content = ""
             else:  # resposta embrulhada em ferramenta inventada, ou texto que só parecia JSON

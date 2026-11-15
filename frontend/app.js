@@ -12,9 +12,14 @@ const input = $("input");
 const sendButton = $("send");
 const stopButton = $("stop");
 const jumpButton = $("jump");
+const attachButton = $("attach");
+const attachMenu = $("attach-menu");
+const docFileInput = $("doc-file");
+const uploadStatus = $("upload-status");
 
 // O histórico vive no servidor (SQLite). Aqui fica só o estado da tela.
 const state = {
+  user: null, // conta da sessão: { id, username, is_admin }
   id: null, // conversa aberta (null = nova, ainda não gravada)
   oldest: null, // id da mensagem mais antiga carregada
   hasMore: false, // há mensagens mais antigas no servidor
@@ -91,8 +96,9 @@ jumpButton.addEventListener("click", smoothToBottom);
 
 /* ---------- Sessão ---------- */
 
-// Na primeira execução (sem senha definida, acessando do próprio PC) a tela de
-// entrada vira "criar senha"; em qualquer outro caso é o login normal.
+// Na primeira execução (nenhuma conta ainda, acessando do próprio PC) a tela de
+// entrada vira "criar a conta do administrador"; em qualquer outro caso é o
+// login normal. Não existe cadastro aberto: as demais contas o administrador cria.
 let setupMode = false;
 let minPasswordLength = 12;
 
@@ -103,22 +109,29 @@ async function showLogin() {
   setupMode = status.setup === true;
   minPasswordLength = status.min_password_length || minPasswordLength;
   $("login-hint").textContent = setupMode
-    ? `Primeiro acesso: crie a senha da Distopic (mínimo ${minPasswordLength} caracteres).`
+    ? `Primeiro acesso: crie a conta do administrador (senha com no mínimo ${minPasswordLength} caracteres).`
     : "IA local · acesso restrito";
+  $("username").autocomplete = setupMode ? "off" : "username";
   $("password").placeholder = setupMode ? "Nova senha" : "Senha";
   $("password").autocomplete = setupMode ? "new-password" : "current-password";
   $("password2").hidden = !setupMode;
   $("password2").required = setupMode;
-  $("login-submit").textContent = setupMode ? "Criar senha e entrar" : "Entrar";
+  $("login-submit").textContent = setupMode ? "Criar conta e entrar" : "Entrar";
   $("login-error").textContent = "";
+  for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
+  state.user = null;
   loginView.hidden = false;
-  $("password").focus();
+  $("username").focus();
 }
 
-async function showChat(model) {
+async function showChat(me) {
+  state.user = me.user;
   loginView.hidden = true;
   chatView.hidden = false;
-  $("model").textContent = model;
+  $("model").textContent = me.model;
+  $("open-account").textContent = `Conta: ${me.user.username}`;
+  $("admin-section").hidden = !me.user.is_admin;
+  setUploadStatus("");
   resetChat();
   await loadConversations();
   await route();
@@ -126,7 +139,7 @@ async function showChat(model) {
 
 async function checkSession() {
   const response = await fetch("/api/me");
-  if (response.ok) await showChat((await response.json()).model);
+  if (response.ok) await showChat(await response.json());
   else showLogin();
 }
 
@@ -145,7 +158,8 @@ $("login-form").addEventListener("submit", async (event) => {
       return;
     }
   }
-  const response = await jsonRequest(setupMode ? "/api/setup" : "/api/login", { password });
+  const username = $("username").value.trim();
+  const response = await jsonRequest(setupMode ? "/api/setup" : "/api/login", { username, password });
   $("password").value = "";
   $("password2").value = "";
   if (response.ok) return checkSession();
@@ -412,6 +426,264 @@ $("new-chat").addEventListener("click", newConversation);
 
 /* ---------- Chat ---------- */
 
+/* ---------- Envio de documentos ---------- */
+// "Alimentar a IA" = indexar o arquivo no RAG privado da conta; o modelo não é treinado.
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const ALLOWED_DOC_EXTENSIONS = [".pdf", ".md", ".txt"];
+let uploadMode = "library";
+
+function setUploadStatus(text, isError = false) {
+  uploadStatus.textContent = text;
+  uploadStatus.classList.toggle("failed", isError);
+  uploadStatus.hidden = !text;
+}
+
+function toggleAttachMenu(open) {
+  attachMenu.hidden = !open;
+  attachButton.setAttribute("aria-expanded", String(open));
+}
+
+attachButton.addEventListener("click", () => toggleAttachMenu(attachMenu.hidden));
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".attach")) toggleAttachMenu(false);
+});
+for (const option of attachMenu.querySelectorAll("button")) {
+  option.addEventListener("click", () => {
+    uploadMode = option.dataset.mode;
+    toggleAttachMenu(false);
+    docFileInput.click();
+  });
+}
+
+// XMLHttpRequest em vez de fetch: é o que informa o progresso do envio.
+function sendDocument(file, mode) {
+  return new Promise((resolve) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("mode", mode);
+    if (mode === "conversation" && state.id) form.append("conversation_id", state.id);
+
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/docs/upload");
+    // Sem Content-Type manual: o navegador define multipart/form-data com o boundary.
+    request.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) return;
+      const percent = Math.round((event.loaded / event.total) * 100);
+      setUploadStatus(`Enviando ${file.name}… ${percent}%`);
+    });
+    request.upload.addEventListener("load", () => {
+      setUploadStatus(`Indexando ${file.name}… isso pode levar alguns segundos.`);
+    });
+    request.addEventListener("load", () => {
+      let body = {};
+      try {
+        body = JSON.parse(request.responseText);
+      } catch {
+        // resposta sem JSON (erro do servidor): tratada pelo status
+      }
+      resolve({ status: request.status, body });
+    });
+    request.addEventListener("error", () => resolve({ status: 0, body: {} }));
+    request.send(form);
+  });
+}
+
+docFileInput.addEventListener("change", async () => {
+  const file = docFileInput.files?.[0];
+  docFileInput.value = "";
+  if (!file) return;
+  const mode = uploadMode;
+
+  const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+  if (!ALLOWED_DOC_EXTENSIONS.includes(extension)) {
+    return setUploadStatus("Envie um arquivo PDF, MD ou TXT.", true);
+  }
+  if (file.size === 0) return setUploadStatus("O arquivo está vazio.", true);
+  if (file.size > MAX_UPLOAD_BYTES) return setUploadStatus("O arquivo excede o limite de 20 MB.", true);
+
+  attachButton.disabled = true;
+  setUploadStatus(`Enviando ${file.name}…`);
+  const { status, body } = await sendDocument(file, mode);
+  attachButton.disabled = false;
+
+  if (status === 401) {
+    setUploadStatus("");
+    return showLogin(); // sessão expirada
+  }
+  if (status === 0) return setUploadStatus("Falha de conexão ao enviar o arquivo.", true);
+  if (status < 200 || status >= 300) {
+    const detail = typeof body.detail === "string" ? body.detail : `Falha no servidor ao processar o arquivo (erro ${status}).`;
+    return setUploadStatus(detail, true);
+  }
+
+  const pieces = `${body.chunks_indexed} ${body.chunks_indexed === 1 ? "trecho indexado" : "trechos indexados"}`;
+  if (mode === "library") {
+    setUploadStatus(`${body.filename}: ${pieces} na sua Biblioteca.`);
+    return;
+  }
+  setUploadStatus(`${body.filename}: ${pieces}, disponível só nesta conversa.`);
+  if (!state.id) {
+    // O servidor criou a conversa para receber o arquivo.
+    state.id = body.conversation_id;
+    history.replaceState(null, "", `#/c/${state.id}`);
+    loadConversations();
+  }
+  append(el("div", "note", `Documento anexado a esta conversa: ${body.filename} (${pieces}).`));
+});
+
+/* ---------- Painéis: documentos e conta ---------- */
+
+for (const button of document.querySelectorAll("dialog [data-close]")) {
+  button.addEventListener("click", () => button.closest("dialog").close());
+}
+
+// Remoção em dois cliques, sem caixa de diálogo: o primeiro arma, o segundo confirma.
+function confirmButton(label, onConfirm) {
+  const button = el("button", "icon delete", "✕");
+  button.type = "button";
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", async () => {
+    if (!button.classList.contains("armed")) {
+      button.classList.add("armed");
+      button.textContent = "Apagar?";
+      setTimeout(() => {
+        button.classList.remove("armed");
+        button.textContent = "✕";
+      }, 3000);
+      return;
+    }
+    button.disabled = true;
+    await onConfirm();
+  });
+  return button;
+}
+
+function documentRows(container, documents, emptyText) {
+  if (!documents.length) return container.replaceChildren(el("div", "empty-list", emptyText));
+  container.replaceChildren(
+    ...documents.map((doc) => {
+      const row = el("div", "row");
+      const name = el("span", "row-name", doc.filename);
+      name.title = doc.filename;
+      const remove = confirmButton(`Apagar ${doc.filename}`, async () => {
+        await fetch(`/api/docs/${encodeURIComponent(doc.id)}`, { method: "DELETE" });
+        await loadDocuments();
+      });
+      row.append(name, el("span", "muted", `${doc.chunks} ${doc.chunks === 1 ? "trecho" : "trechos"}`), remove);
+      return row;
+    })
+  );
+}
+
+async function loadDocuments() {
+  const query = state.id ? `?conversation_id=${encodeURIComponent(state.id)}` : "";
+  const response = await fetch(`/api/docs${query}`);
+  if (response.status === 401) return showLogin();
+  if (!response.ok) return;
+  const data = await response.json();
+  documentRows($("docs-library"), data.library, "Nenhum documento na Biblioteca. Use o botão ＋ ao lado da mensagem.");
+  documentRows(
+    $("docs-conversation"),
+    data.conversation,
+    state.id ? "Nenhum arquivo anexado a esta conversa." : "Abra uma conversa para ver os arquivos anexados a ela."
+  );
+}
+
+$("open-docs").addEventListener("click", async () => {
+  closeDrawer();
+  await loadDocuments();
+  $("docs-dialog").showModal();
+});
+
+async function responseMessage(response, fallback) {
+  const data = await response.json().catch(() => ({}));
+  return typeof data.detail === "string" ? data.detail : fallback;
+}
+
+function userRow(user) {
+  const row = el("div", "row");
+  const name = el("span", "row-name", user.username);
+  row.append(name, el("span", "muted", user.is_admin ? "administrador" : "conta comum"));
+
+  // Redefinir a senha de outra conta (quem esqueceu a própria).
+  const reset = el("button", "icon", "Redefinir senha");
+  reset.type = "button";
+  reset.addEventListener("click", () => {
+    const field = el("input");
+    field.type = "password";
+    field.placeholder = `Nova senha de ${user.username}`;
+    field.autocomplete = "new-password";
+    const save = el("button", "", "Salvar");
+    save.type = "button";
+    const result = el("span", "muted");
+    save.addEventListener("click", async () => {
+      const response = await jsonRequest(`/api/users/${encodeURIComponent(user.id)}/password`, { password: field.value });
+      result.textContent = response.ok ? "Senha redefinida." : await responseMessage(response, "Não foi possível redefinir.");
+      if (response.ok) field.value = "";
+    });
+    const form = el("div", "row row-form");
+    form.append(field, save, result);
+    row.after(form);
+    reset.disabled = true;
+    field.focus();
+  });
+  row.append(reset);
+
+  if (user.id !== state.user.id) {
+    row.append(
+      confirmButton(`Remover a conta ${user.username}`, async () => {
+        await fetch(`/api/users/${encodeURIComponent(user.id)}`, { method: "DELETE" });
+        await loadUsers();
+      })
+    );
+  }
+  return row;
+}
+
+async function loadUsers() {
+  if (!state.user || !state.user.is_admin) return;
+  const response = await fetch("/api/users");
+  if (!response.ok) return;
+  const { users } = await response.json();
+  $("users").replaceChildren(...users.map(userRow));
+}
+
+$("open-account").addEventListener("click", async () => {
+  closeDrawer();
+  $("own-password-result").textContent = "";
+  $("new-user-result").textContent = "";
+  await loadUsers();
+  $("account-dialog").showModal();
+});
+
+$("own-password-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const result = $("own-password-result");
+  const response = await jsonRequest("/api/me/password", {
+    current_password: $("current-password").value,
+    new_password: $("new-password").value,
+  });
+  if (response.status === 401) return showLogin();
+  result.textContent = response.ok ? "Senha alterada." : await responseMessage(response, "Não foi possível trocar a senha.");
+  if (response.ok) event.target.reset();
+});
+
+$("new-user-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const result = $("new-user-result");
+  const username = $("new-user-name").value.trim();
+  const response = await jsonRequest("/api/users", { username, password: $("new-user-password").value });
+  if (response.status === 401) return showLogin();
+  if (!response.ok) {
+    result.textContent = await responseMessage(response, "Não foi possível criar a conta.");
+    return;
+  }
+  result.textContent = `Conta ${username} criada. Passe o usuário e a senha inicial à pessoa.`;
+  event.target.reset();
+  await loadUsers();
+});
+
 function setGenerating(controller) {
   state.abort = controller;
   const generating = controller !== null;
@@ -508,6 +780,15 @@ async function sendMessage(text, controller) {
     } else if (event.type === "tool_result") {
       if (card) fillToolCard(card, event.ok, event.output);
       bubble = append(el("div", "msg assistant pending"));
+    } else if (event.type === "sources") {
+      // Documentos do próprio usuário que entraram no contexto desta resposta.
+      const note = el("div", "note", `Documentos consultados: ${event.documents.join(", ")}`);
+      messagesEl.insertBefore(note, bubble && bubble.parentNode === messagesEl ? bubble : null);
+      contentGrew();
+    } else if (event.type === "notice") {
+      const note = el("div", "note", event.message);
+      messagesEl.insertBefore(note, bubble && bubble.parentNode === messagesEl ? bubble : null);
+      contentGrew();
     } else if (event.type === "truncated") {
       flush();
       append(el("div", "note", "Resposta cortada pelo limite de tamanho. Envie \"continue\" para seguir."));

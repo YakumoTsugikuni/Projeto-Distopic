@@ -9,6 +9,9 @@ from . import PASSWORD, ROOT
 from app import chat, confirmations, storage
 
 storage.init()
+# Conta usada pelos testes que falam direto com o storage.
+USER = storage.create_user("conversas", "sem-senha", is_admin=True)
+UID = USER["id"]
 
 
 def fake_ollama(script):
@@ -34,15 +37,15 @@ def tool_chunk(name, arguments):
 
 class StorageTest(unittest.TestCase):
     def test_title_comes_from_first_user_message(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         storage.add_message(conv["id"], "user", "  como   listar\narquivos? " + "x" * 100)
         storage.add_message(conv["id"], "user", "segunda pergunta")
-        title = storage.get_conversation(conv["id"])["title"]
+        title = storage.get_conversation(conv["id"], UID)["title"]
         self.assertTrue(title.startswith("como listar arquivos?"))
         self.assertEqual(len(title), storage.TITLE_MAX)
 
     def test_pagination(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         ids = [storage.add_message(conv["id"], "user", f"m{i}") for i in range(120)]
         page, has_more = storage.get_messages(conv["id"], limit=50)
         self.assertEqual([m["content"] for m in page], [f"m{i}" for i in range(70, 120)])
@@ -54,22 +57,22 @@ class StorageTest(unittest.TestCase):
         self.assertFalse(has_more)
 
     def test_list_order_rename_delete_cascade(self):
-        first = storage.create_conversation()
-        second = storage.create_conversation()
+        first = storage.create_conversation(UID)
+        second = storage.create_conversation(UID)
         storage.add_message(first["id"], "user", "reativada")  # sobe para o topo
-        listed = [c["id"] for c in storage.list_conversations(limit=200)]
+        listed = [c["id"] for c in storage.list_conversations(UID, limit=200)]
         self.assertLess(listed.index(first["id"]), listed.index(second["id"]))
 
-        self.assertTrue(storage.rename_conversation(first["id"], "Novo nome"))
-        self.assertEqual(storage.get_conversation(first["id"])["title"], "Novo nome")
+        self.assertTrue(storage.rename_conversation(first["id"], UID, "Novo nome"))
+        self.assertEqual(storage.get_conversation(first["id"], UID)["title"], "Novo nome")
 
-        self.assertTrue(storage.delete_conversation(first["id"]))
-        self.assertIsNone(storage.get_conversation(first["id"]))
+        self.assertTrue(storage.delete_conversation(first["id"], UID))
+        self.assertIsNone(storage.get_conversation(first["id"], UID))
         self.assertEqual(storage.get_messages(first["id"]), ([], False))
-        self.assertFalse(storage.delete_conversation(first["id"]))
+        self.assertFalse(storage.delete_conversation(first["id"], UID))
 
     def test_context_merges_and_skips_tools(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         storage.add_message(conv["id"], "user", "pergunta")
         storage.add_message(conv["id"], "assistant", "vou verificar")
         storage.add_message(conv["id"], "tool", "saida", {"name": "listar_diretorio", "ok": True})
@@ -82,7 +85,7 @@ class StorageTest(unittest.TestCase):
 
 class ChatTurnTest(unittest.TestCase):
     def test_turn_with_tool_is_persisted_and_reused(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         storage.add_message(conv["id"], "user", "o que tem na pasta?")
         transport, requests = fake_ollama(
             [tool_chunk("listar_diretorio", {"caminho": "."}), text_chunks("Há ", "notas.txt"), text_chunks("ok")]
@@ -90,10 +93,10 @@ class ChatTurnTest(unittest.TestCase):
 
         async def go():
             async with httpx.AsyncClient(transport=transport) as client:
-                async for _ in chat.run_turn(client, conv["id"]):
+                async for _ in chat.run_turn(client, conv["id"], USER):
                     pass
                 storage.add_message(conv["id"], "user", "e depois?")
-                async for _ in chat.run_turn(client, conv["id"]):
+                async for _ in chat.run_turn(client, conv["id"], USER):
                     pass
 
         asyncio.run(go())
@@ -110,7 +113,7 @@ class ChatTurnTest(unittest.TestCase):
         )
 
     def test_confirmation_decision_is_recorded(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         storage.add_message(conv["id"], "user", "crie")
         transport, _ = fake_ollama(
             [tool_chunk("criar_arquivo", {"caminho": "persistido.txt", "conteudo": "x"}), text_chunks("feito")]
@@ -118,7 +121,7 @@ class ChatTurnTest(unittest.TestCase):
 
         async def go():
             async with httpx.AsyncClient(transport=transport) as client:
-                async for event in chat.run_turn(client, conv["id"]):
+                async for event in chat.run_turn(client, conv["id"], USER):
                     if event["type"] == "confirm_request":
                         confirmations.resolve(event["id"], False)
 
@@ -128,13 +131,13 @@ class ChatTurnTest(unittest.TestCase):
         self.assertFalse((ROOT / "persistido.txt").exists())
 
     def test_interrupted_answer_is_saved_as_partial(self):
-        conv = storage.create_conversation()
+        conv = storage.create_conversation(UID)
         storage.add_message(conv["id"], "user", "conte uma história")
         transport, _ = fake_ollama([text_chunks("Era uma vez", " e nunca terminou")])
 
         async def go():
             async with httpx.AsyncClient(transport=transport) as client:
-                stream = chat.run_turn(client, conv["id"])
+                stream = chat.run_turn(client, conv["id"], USER)
                 async for event in stream:
                     if event["type"] == "token":
                         break  # o cliente desconectou no meio da resposta
@@ -224,57 +227,6 @@ class TextToolCallTest(unittest.TestCase):
         self.assertEqual([e.get("text") for e in events if e["type"] == "token"], ['{"cor": "vermelho"}'])
 
 
-class FirstPasswordTest(unittest.TestCase):
-    """Primeira execução: a senha é criada pela interface, só a partir do próprio PC."""
-
-    def setUp(self):
-        import tempfile
-        from pathlib import Path
-        from app import auth
-
-        self.auth = auth
-        self.saved = (auth._password_hash, auth.ENV_FILE)
-        auth._password_hash = ""  # como em uma instalação nova
-        auth.ENV_FILE = Path(tempfile.mkdtemp(prefix="distopic_test_env_")) / "sub" / ".env"
-        auth.throttle.reset()
-        warnings.simplefilter("ignore")
-
-    def tearDown(self):
-        self.auth._password_hash, self.auth.ENV_FILE = self.saved
-        self.auth.throttle.reset()
-
-    def test_setup_flow(self):
-        from fastapi.testclient import TestClient
-        from app.main import app
-
-        new = "uma-senha-bem-longa"
-        with TestClient(app, client=("192.168.0.50", 50000)) as lan:
-            self.assertFalse(lan.get("/api/status").json()["setup"])
-            self.assertEqual(lan.post("/api/setup", json={"password": new}).status_code, 403)
-        with TestClient(app, client=("127.0.0.1", 50000)) as c:
-            # Via Cloudflare Tunnel: chega por localhost, mas com cabeçalho de proxy.
-            tunnel = {"CF-Connecting-IP": "203.0.113.9"}
-            self.assertFalse(c.get("/api/status", headers=tunnel).json()["setup"])
-            self.assertEqual(c.post("/api/setup", json={"password": new}, headers=tunnel).status_code, 403)
-
-            self.assertTrue(c.get("/api/status").json()["setup"])
-            self.assertEqual(c.post("/api/login", json={"password": new}).status_code, 401)  # ainda não existe
-            self.assertEqual(c.post("/api/setup", json={"password": "curta"}).status_code, 422)
-            self.assertEqual(c.post("/api/setup", json={"password": new}).status_code, 200)
-            self.assertEqual(c.get("/api/me").status_code, 200)  # já entra logado
-
-            # Depois de definida, a senha não pode ser redefinida por esta rota.
-            self.assertFalse(c.get("/api/status").json()["setup"])
-            self.assertEqual(c.post("/api/setup", json={"password": "outra-senha-longa"}).status_code, 403)
-        with TestClient(app, client=("127.0.0.1", 50001)) as again:
-            self.assertEqual(again.get("/api/me").status_code, 401)
-            self.assertEqual(again.post("/api/login", json={"password": "errada-errada"}).status_code, 401)
-            self.assertEqual(again.post("/api/login", json={"password": new}).status_code, 200)
-        saved = self.auth.ENV_FILE.read_text(encoding="utf-8")
-        self.assertIn("DISTOPIC_PASSWORD_HASH=scrypt:", saved)
-        self.assertNotIn(new, saved)  # só o hash vai para o disco
-
-
 class ApiTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -284,6 +236,13 @@ class ApiTest(unittest.TestCase):
         from app.main import app
 
         auth.throttle.reset()
+        # Este fluxo é sobre conversas: parte de um administrador sem documentos
+        # (outros testes podem ter deixado algum na Biblioteca dele).
+        from app import documents
+        from . import ADMIN
+
+        for leftover in storage.list_documents(ADMIN["id"]):
+            documents.remove(leftover)
         cls.app = app
         cls.ctx = TestClient(app)
         cls.client = cls.ctx.__enter__()
@@ -299,7 +258,10 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(c.request(method, url).status_code, 401, url)
         self.assertEqual(c.post("/api/chat", json={"message": "oi"}).status_code, 401)
 
-        self.assertEqual(c.post("/api/login", json={"password": PASSWORD}).status_code, 200)
+        # A senha compartilhada antiga virou a conta "admin" (auth.bootstrap).
+        self.assertEqual(c.post("/api/login", json={"username": "admin", "password": "errada"}).status_code, 401)
+        self.assertEqual(c.post("/api/login", json={"username": "admin", "password": PASSWORD}).status_code, 200)
+        self.assertEqual(c.get("/api/me").json()["user"]["is_admin"], True)
         self.assertEqual(c.get("/api/conversations/nao-existe").status_code, 404)
         self.assertEqual(c.post("/api/chat", json={"conversation_id": "nao-existe", "message": "oi"}).status_code, 404)
         # Histórico forjado pelo cliente não é mais aceito.

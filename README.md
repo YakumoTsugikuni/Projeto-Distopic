@@ -13,8 +13,8 @@ backend/
     __main__.py          python -m app  -> inicia o servidor
     main.py              rotas da API + frontend estático + cabeçalhos de segurança
     config.py            configuração via .env / variáveis de ambiente
-    auth.py              senha (scrypt), sessão em cookie, bloqueio de força bruta
-    set_password.py      python -m app.set_password
+    auth.py              contas (scrypt), sessão em cookie, administrador, bloqueio de força bruta
+    set_password.py      python -m app.set_password [usuario]
     ollama_client.py     streaming de /api/chat do Ollama
     agent.py             laço modelo <-> ferramentas
     tools/
@@ -24,9 +24,10 @@ backend/
       ler_arquivo.py       (leitura, paginada)
       criar_arquivo.py     (escrita — pede confirmação)
     confirmations.py     pedidos de confirmação pendentes (POST /api/confirm)
-    storage.py           conversas em SQLite (%LOCALAPPDATA%\Distopic\distopic.db)
-    chat.py              um turno: contexto do banco -> agente -> gravação
-    rag/                 (etapa 4 — ainda não implementado)
+    storage.py           contas, conversas e registro de documentos em SQLite (%LOCALAPPDATA%\Distopic\distopic.db)
+    chat.py              um turno: contexto do banco + RAG -> agente -> gravação
+    documents.py         upload: arquivo em disco + registro + vetores; remoção; migração dos antigos
+    rag/                 embeddings (Ollama), indexação e busca no ChromaDB, sempre filtradas por dono
   tests/
 frontend/
   index.html  style.css  app.js     login + chat com streaming
@@ -48,8 +49,35 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m app
 ```
 
-A senha é criada na própria tela de entrada, no primeiro acesso feito deste PC
-(ou pelo terminal: `.\.venv\Scripts\python.exe -m app.set_password`).
+Também é preciso o modelo de embeddings do RAG: `ollama pull nomic-embed-text`.
+
+## Contas
+
+- Cada pessoa tem uma conta (usuário + senha). Conversas, documentos e buscas são isolados por conta —
+  nem o administrador vê os dados dos outros.
+- **Não há cadastro aberto.** A primeira conta é criada na tela de entrada, só a partir deste PC, e é a
+  administradora. As demais o administrador cria em **Conta** (barra lateral), onde também redefine senhas
+  e remove contas (o que apaga conversas, arquivos e vetores daquela conta).
+- **Quem já usava a senha única:** na primeira execução ela vira a senha da conta `admin`, que recebe as
+  conversas e os documentos que já existiam.
+- Senha esquecida: `.\.venv\Scripts\python.exe -m app.set_password [usuario]` (sem argumento: o administrador).
+- As ferramentas de arquivos do PC (`listar_diretorio`, `ler_arquivo`, `criar_arquivo`) só ficam
+  disponíveis para administradores.
+
+## Documentos (RAG privado)
+
+O botão **＋** ao lado da mensagem envia PDF, MD ou TXT (até 20 MB), com duas opções:
+
+- **Adicionar à minha Biblioteca** — guardado em `Biblioteca\<id da conta>\` e consultado em todas as
+  conversas daquela conta.
+- **Usar só nesta conversa** — guardado em `Temporarios\<id da conta>\<id da conversa>\`, consultado só ali
+  e apagado junto com a conversa.
+
+A cada pergunta a busca roda sozinha nos documentos da conta (Biblioteca + temporários da conversa) e o
+nome do arquivo vai no contexto, para a resposta citar a fonte. "Alimentar a IA" é isso: indexar e
+recuperar — o modelo não é treinado nem modificado. Todo vetor no ChromaDB leva `owner_id` (e
+`conversation_id` nos temporários), e toda busca filtra por eles; vetores antigos sem dono não aparecem
+para ninguém até a migração entregá-los ao administrador.
 
 Abra http://localhost:8000. Depois de uma resposta, `ollama ps` deve mostrar `100% GPU`.
 
