@@ -13,6 +13,7 @@
       <img class="login-logo" src="assets/logo.png" alt="" width="112" height="112">
       <h1>DISTOPIC</h1>
       <p id="login-hint" class="muted">IA local · acesso restrito</p>
+      <input id="username" type="text" placeholder="Usuário" autocomplete="username" autocapitalize="none" spellcheck="false" required>
       <input id="password" type="password" placeholder="Senha" autocomplete="current-password" required>
       <input id="password2" type="password" placeholder="Repita a senha" autocomplete="new-password" hidden>
       <button id="login-submit" type="submit">Entrar</button>
@@ -26,11 +27,10 @@
     <aside id="sidebar">
       <div class="brand"><img src="assets/logo.png" alt="" width="34" height="34">DISTOPIC</div>
       <button id="new-chat" type="button" title="Ctrl+N">Nova conversa</button>
-      <button id="upload-doc" class="ghost" type="button">Enviar documento</button>
-      <input id="doc-file" type="file" accept=".pdf,.md,.txt" hidden>
-      <div id="upload-status" class="muted" role="status" aria-live="polite"></div>
       <input id="search" type="search" placeholder="Buscar conversas" title="Ctrl+K" autocomplete="off">
       <nav id="conversations" aria-label="Conversas"></nav>
+      <button id="open-docs" class="ghost" type="button">Documentos</button>
+      <button id="open-account" class="ghost" type="button">Conta</button>
       <button id="logout" class="ghost" type="button">Sair</button>
     </aside>
 
@@ -47,13 +47,69 @@
         <button id="jump" type="button" hidden>↓ Novas mensagens</button>
       </div>
 
+      <div id="upload-status" class="upload-status" role="status" aria-live="polite" hidden></div>
+
       <form id="chat-form">
+        <div class="attach">
+          <button id="attach" class="ghost" type="button" aria-haspopup="true" aria-expanded="false"
+                  aria-controls="attach-menu" title="Enviar documento (PDF, MD ou TXT)">＋</button>
+          <div id="attach-menu" class="attach-menu" role="menu" hidden>
+            <button type="button" role="menuitem" data-mode="library">
+              <strong>Adicionar à minha Biblioteca</strong>
+              <span>Fica guardado e é consultado em todas as suas conversas.</span>
+            </button>
+            <button type="button" role="menuitem" data-mode="conversation">
+              <strong>Usar só nesta conversa</strong>
+              <span>Vale apenas aqui e é apagado junto com a conversa.</span>
+            </button>
+          </div>
+          <input id="doc-file" type="file" accept=".pdf,.md,.txt" hidden>
+        </div>
         <textarea id="input" rows="1" placeholder="Mensagem (Enter envia, Shift+Enter quebra linha)" required></textarea>
         <button id="send" type="submit">Enviar</button>
         <button id="stop" type="button" title="Esc" hidden>Parar</button>
       </form>
     </div>
   </div>
+
+  <dialog id="docs-dialog" aria-labelledby="docs-title">
+    <header>
+      <h2 id="docs-title">Documentos</h2>
+      <button class="icon" type="button" data-close aria-label="Fechar">✕</button>
+    </header>
+    <p class="muted">Só você consulta estes documentos. Eles não são compartilhados com outras contas.</p>
+    <h3>Minha Biblioteca</h3>
+    <div id="docs-library" class="rows"></div>
+    <h3>Só nesta conversa</h3>
+    <div id="docs-conversation" class="rows"></div>
+  </dialog>
+
+  <dialog id="account-dialog" aria-labelledby="account-title">
+    <header>
+      <h2 id="account-title">Conta</h2>
+      <button class="icon" type="button" data-close aria-label="Fechar">✕</button>
+    </header>
+
+    <h3>Trocar minha senha</h3>
+    <form id="own-password-form" class="stack">
+      <input id="current-password" type="password" placeholder="Senha atual" autocomplete="current-password" required>
+      <input id="new-password" type="password" placeholder="Nova senha" autocomplete="new-password" required>
+      <button type="submit">Trocar senha</button>
+      <p id="own-password-result" class="muted" role="status"></p>
+    </form>
+
+    <section id="admin-section" hidden>
+      <h3>Contas</h3>
+      <p class="muted">Cada conta tem conversas e documentos próprios, invisíveis para as demais.</p>
+      <div id="users" class="rows"></div>
+      <form id="new-user-form" class="stack">
+        <input id="new-user-name" type="text" placeholder="Usuário da nova conta" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <input id="new-user-password" type="password" placeholder="Senha inicial" autocomplete="new-password" required>
+        <button type="submit">Criar conta</button>
+        <p id="new-user-result" class="muted" role="status"></p>
+      </form>
+    </section>
+  </dialog>
 
   <script src="app.js"></script>
 </body>

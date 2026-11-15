@@ -1,5 +1,9 @@
-"""Pipeline de RAG local (etapa 4 da especificação) — ainda não implementado.
+"""RAG local e privado por conta.
 
-Plano: ingestão de .md/.txt/.pdf -> fatiamento -> embeddings via Ollama
-(nomic-embed-text) -> índice em SQLite -> ferramenta `buscar_documentacao`.
+Fluxo: arquivo (.pdf/.md/.txt) -> texto -> trechos -> embeddings via Ollama
+(nomic-embed-text) -> ChromaDB. Nada disso treina ou altera o modelo: os
+trechos só são recuperados e colocados no contexto da pergunta.
+
+Isolamento: cada vetor carrega `owner_id` (e `conversation_id` quando é um
+arquivo temporário). Toda busca filtra por dono — ver retriever.search_docs.
 """

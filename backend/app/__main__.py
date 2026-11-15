@@ -28,10 +28,10 @@ def _exit_with_parent(pid: int) -> None:
 def main() -> None:
     import sys
 
-    if sys.argv[1:] == ["set-password"]:  # usado pelo executável instalado
+    if sys.argv[1:2] == ["set-password"]:  # usado pelo executável instalado
         from .set_password import main as set_password
 
-        return set_password()
+        return set_password(sys.argv[2:])
 
     parent = os.environ.get("DISTOPIC_PARENT_PID", "")
     if parent.isdigit() and os.name == "nt":
