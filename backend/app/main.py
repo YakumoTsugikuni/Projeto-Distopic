@@ -22,10 +22,11 @@ from .ollama_client import OllamaError
 from pathlib import Path
 from uuid import uuid4
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from .rag.indexer import index_file
 
 log = logging.getLogger("distopic")
 
-DOCS_DIR = settings.data_dir / "docs"
+DOCS_DIR = settings.data_dir / "Biblioteca"
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ALLOWED_DOC_EXTENSIONS = {".pdf", ".md", ".txt"}
 

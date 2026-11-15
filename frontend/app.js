@@ -12,6 +12,9 @@ const input = $("input");
 const sendButton = $("send");
 const stopButton = $("stop");
 const jumpButton = $("jump");
+const uploadButton = $("upload-doc");
+const docFileInput = $("doc-file");
+const uploadStatus = $("upload-status");
 
 // O histórico vive no servidor (SQLite). Aqui fica só o estado da tela.
 const state = {
@@ -411,6 +414,48 @@ function newConversation() {
 $("new-chat").addEventListener("click", newConversation);
 
 /* ---------- Chat ---------- */
+
+uploadButton.addEventListener("click", () => docFileInput.click());
+
+docFileInput.addEventListener("change", async () => {
+  const file = docFileInput.files?.[0];
+  if (!file) return;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  uploadButton.disabled = true;
+  uploadStatus.textContent = `Enviando e indexando ${file.name}...`;
+
+  try {
+    const response = await fetch("/api/docs/upload", {
+      method: "POST",
+      body: form,
+    });
+
+    if (response.status === 401) {
+      await showLogin();
+      return;
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      uploadStatus.textContent =
+        typeof result.detail === "string" ? result.detail : `Falha no envio (${response.status}).`;
+      return;
+    }
+
+    uploadStatus.textContent = result.chunks_indexed > 0
+      ? `${file.name}: ${result.chunks_indexed} trechos indexados.`
+      : `${file.name}: nenhum texto foi extraído.`;
+  } catch {
+    uploadStatus.textContent = "Falha de conexão ao enviar o arquivo.";
+  } finally {
+    uploadButton.disabled = false;
+    docFileInput.value = "";
+  }
+});
 
 function setGenerating(controller) {
   state.abort = controller;
