@@ -19,7 +19,15 @@ from .chat import run_turn
 from .config import FRONTEND_DIR, settings
 from .ollama_client import OllamaError
 
+from pathlib import Path
+from uuid import uuid4
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+
 log = logging.getLogger("distopic")
+
+DOCS_DIR = settings.data_dir / "docs"
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+ALLOWED_DOC_EXTENSIONS = {".pdf", ".md", ".txt"}
 
 
 @asynccontextmanager
@@ -220,6 +228,30 @@ async def confirm(body: ConfirmBody):
 def _error(message: str) -> str:
     return json.dumps({"type": "error", "message": message}, ensure_ascii=False) + "\n"
 
+@app.post("/api/docs/upload", dependencies=[Depends(auth.require_session)])
+async def upload_document(file: UploadFile = File(...)):
+    original_name = Path(file.filename or "").name
+    extension = Path(original_name).suffix.lower()
 
+    if not original_name or extension not in ALLOWED_DOC_EXTENSIONS:
+        raise HTTPException(400, "Envie um arquivo PDF, MD ou TXT.")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not content:
+        raise HTTPException(400, "O arquivo está vazio.")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "O arquivo excede o limite de 20 MB.")
+
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid4().hex}_{original_name}"
+    file_path = DOCS_DIR / stored_name
+    file_path.write_bytes(content)
+
+    chunks_indexed = await index_file(str(file_path))
+    return {
+        "status": "ok",
+        "filename": original_name,
+        "chunks_indexed": chunks_indexed,
+    }
 # Por último: tudo que não é /api/* serve o frontend (a tela de login é pública).
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

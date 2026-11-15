@@ -3,10 +3,12 @@ import hashlib
 from pypdf import PdfReader
 import chromadb
 from .embedder import get_embedding
+from ..config import settings
+
 
 # Caminho de persistência do ChromaDB no SSD
-CHROMA_PATH = os.path.join("workspace", "vector_db")
-chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+CHROMA_PATH = settings.data_dir / "vector_db"
+chroma_client = chromadb.PersistentClient(path=str(CHROMA_PATH))
 collection = chroma_client.get_or_create_collection(name="distopic_docs")
 
 def extract_text(file_path: str) -> str:
