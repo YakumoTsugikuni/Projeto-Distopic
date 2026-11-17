@@ -191,11 +191,14 @@ class ConversationIsolationTest(AccountsCase):
         app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(fake_ollama))
         events = lambda r: [json.loads(line)["type"] for line in r.text.splitlines()]  # noqa: E731
 
-        common = events(self.ana.post("/api/chat", json={"message": "liste a pasta"}))
-        self.assertEqual(seen[0]["tools"], [])
-        self.assertNotIn("tool_call", common)
+        blocked = self.ana.post("/api/chat", json={"message": "liste a pasta"})
+        self.assertEqual(seen[0]["tools"], [])  # nem é oferecida ao modelo
+        denied = next(e for e in map(json.loads, blocked.text.splitlines()) if e["type"] == "tool_result")
+        self.assertFalse(denied["ok"])  # e, se o modelo insiste, a execução recusa
+        self.assertIn("administrador", denied["output"])
+        seen.clear()
         admin = events(self.admin.post("/api/chat", json={"message": "liste a pasta"}))
-        self.assertTrue(seen[1]["tools"])
+        self.assertIn("listar_diretorio", [t["function"]["name"] for t in seen[0]["tools"]])
         self.assertIn("tool_result", admin)
         self.assertEqual(self.ana.post("/api/confirm", json={"id": "x", "approved": True}).status_code, 403)
 
@@ -230,33 +233,86 @@ class DocumentIsolationTest(AccountsCase):
         with self.assertRaises(ValueError):
             asyncio.run(indexer.index_file("x.txt", owner_id="", doc_id="d", source="x.txt"))
 
-    def test_chat_uses_only_own_documents_and_names_the_source(self):
+    def test_rag_runs_only_on_demand_and_only_over_own_documents(self):
+        from app.rag import embedder
+
         upload(self.ana, "manual-foguete.txt", "o foguete Aurora decola da base Polaris ao amanhecer")
         seen = []
+        use_tool = False
 
         def fake_ollama(request: httpx.Request) -> httpx.Response:
             seen.append(json.loads(request.content))
-            return httpx.Response(200, text=json.dumps({"message": {"role": "assistant", "content": "ok"}}))
+            last = seen[-1]["messages"][-1]
+            if use_tool and last["role"] == "user":  # o modelo decide consultar os documentos
+                call = {"function": {"name": "buscar_documentos", "arguments": {"consulta": last["content"]}}}
+                message = {"role": "assistant", "content": "", "tool_calls": [call]}
+            else:
+                message = {"role": "assistant", "content": "ok"}
+            return httpx.Response(200, text=json.dumps({"message": message}))
 
         app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(fake_ollama))
-        question = "de onde decola o foguete Aurora"
+        searches = []
+        real_embedding = embedder.get_embedding
 
-        answer = self.ana.post("/api/chat", json={"message": question})
-        events = [json.loads(line) for line in answer.text.splitlines()]
-        prompt = seen[-1]["messages"][-1]["content"]
-        self.assertIn("[Fonte: manual-foguete.txt]", prompt)
-        self.assertIn("base Polaris", prompt)
-        self.assertIn(f"Pergunta original: {question}", prompt)
-        cited = next(e for e in events if e["type"] == "sources")
-        self.assertIn("manual-foguete.txt", cited["documents"])
-        # O texto injetado não é gravado como se fosse a mensagem do usuário.
-        cid = events[0]["id"]
-        self.assertEqual(self.ana.get(f"/api/conversations/{cid}").json()["messages"][0]["content"], question)
+        async def counting_embedding(text):
+            searches.append(text)
+            return await real_embedding(text)
 
-        self.bia.post("/api/chat", json={"message": question})
-        bia_prompt = seen[-1]["messages"][-1]["content"]
-        self.assertNotIn("manual-foguete.txt", bia_prompt)  # nada da Ana no contexto da Bia
-        self.assertNotIn("Polaris", bia_prompt)
+        embedder.get_embedding = counting_embedding
+        try:
+            # Conversa comum: nenhuma busca, nada injetado na mensagem.
+            self.ana.post("/api/chat", json={"message": "bom dia"})
+            self.assertEqual(searches, [])
+            self.assertEqual(seen[-1]["messages"][-1]["content"], "bom dia")
+            offered = {t["function"]["name"]: t["function"] for t in seen[-1]["tools"]}
+            # A ferramenta é oferecida (sem as de disco) e lista os documentos da conta.
+            self.assertEqual(set(offered), {"buscar_documentos"})
+            self.assertIn("manual-foguete.txt", offered["buscar_documentos"]["description"])
+
+            use_tool = True
+            question = "segundo o manual, de onde decola o foguete Aurora"
+            answer = self.ana.post("/api/chat", json={"message": question})
+            events = [json.loads(line) for line in answer.text.splitlines()]
+            self.assertEqual(len(searches), 1)  # buscou uma vez, porque o modelo pediu
+            result = next(e for e in events if e["type"] == "tool_result")
+            self.assertTrue(result["ok"])
+            self.assertIn("[Fonte: manual-foguete.txt]", result["output"])
+            self.assertIn("base Polaris", result["output"])
+            # O resultado volta ao modelo como mensagem de ferramenta; a pergunta fica intacta.
+            self.assertEqual(seen[-1]["messages"][-1]["role"], "tool")
+            self.assertIn("base Polaris", seen[-1]["messages"][-1]["content"])
+            cid = events[0]["id"]
+            stored = self.ana.get(f"/api/conversations/{cid}").json()["messages"]
+            self.assertEqual(stored[0]["content"], question)
+            self.assertEqual(stored[1]["meta"]["name"], "buscar_documentos")
+
+            # A outra conta chama a mesma ferramenta e não alcança nada da Ana.
+            answer = self.bia.post("/api/chat", json={"message": question})
+            result = next(e for e in map(json.loads, answer.text.splitlines()) if e["type"] == "tool_result")
+            self.assertNotIn("Polaris", result["output"])
+            self.assertNotIn("manual-foguete.txt", result["output"])
+            self.assertNotIn("Polaris", json.dumps(seen[-1], ensure_ascii=False))
+        finally:
+            embedder.get_embedding = real_embedding
+
+    def test_search_tool_is_scoped_by_session_not_by_arguments(self):
+        from app import tools
+        from app.tools.context import ToolContext
+
+        upload(self.ana, "cofre.txt", "a combinacao do cofre da Ana e 48-15-16")
+        run = lambda ctx, args: asyncio.run(tools.execute("buscar_documentos", args, ctx))  # noqa: E731
+        ana = ToolContext(user_id=self.ana_id, document_names=("cofre.txt",))
+        bia = ToolContext(user_id=self.bia_id)
+
+        self.assertIn("48-15-16", run(ana, {"consulta": "combinacao do cofre"}).output)
+        self.assertNotIn("48-15-16", run(bia, {"consulta": "combinacao do cofre"}).output)
+        # O dono não é um argumento: o modelo não tem como apontar para outra conta.
+        forged = run(bia, {"consulta": "combinacao do cofre", "owner_id": self.ana_id})
+        self.assertFalse(forged.ok)
+        self.assertFalse(run(ToolContext(), {"consulta": "combinacao do cofre"}).ok)  # sem conta
+        # Sem documentos, a ferramenta nem é oferecida ao modelo.
+        self.assertEqual(tools.ollama_schemas(bia), [])
+        self.assertEqual([s["function"]["name"] for s in tools.ollama_schemas(ana)], ["buscar_documentos"])
 
     def test_temporary_file_is_limited_to_its_conversation(self):
         first = self.ana.post("/api/conversations").json()["id"]

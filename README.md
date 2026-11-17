@@ -22,7 +22,9 @@ backend/
       sandbox.py         confinamento de caminhos às pastas permitidas
       listar_diretorio.py  (leitura)
       ler_arquivo.py       (leitura, paginada)
-      criar_arquivo.py     (escrita — pede confirmação)
+      criar_arquivo.py     (escrita — pede confirmação; cria as pastas do caminho)
+      buscar_documentos.py (leitura — RAG sob demanda nos documentos da conta)
+      context.py           conta e conversa do turno (ToolContext)
     confirmations.py     pedidos de confirmação pendentes (POST /api/confirm)
     storage.py           contas, conversas e registro de documentos em SQLite (%LOCALAPPDATA%\Distopic\distopic.db)
     chat.py              um turno: contexto do banco + RAG -> agente -> gravação
@@ -61,8 +63,10 @@ Também é preciso o modelo de embeddings do RAG: `ollama pull nomic-embed-text`
 - **Quem já usava a senha única:** na primeira execução ela vira a senha da conta `admin`, que recebe as
   conversas e os documentos que já existiam.
 - Senha esquecida: `.\.venv\Scripts\python.exe -m app.set_password [usuario]` (sem argumento: o administrador).
-- As ferramentas de arquivos do PC (`listar_diretorio`, `ler_arquivo`, `criar_arquivo`) só ficam
-  disponíveis para administradores.
+- As ferramentas de arquivos do PC (`listar_diretorio`, `ler_arquivo`, `criar_arquivo`) são exclusivas de
+  administradores: não são oferecidas ao modelo em contas comuns e, se ele as chamar mesmo assim, a
+  execução recusa com um erro claro. `criar_arquivo` cria as pastas do caminho que faltarem.
+- Pastas liberadas: `DISTOPIC_ALLOWED_ROOTS` aceita várias, separadas por `;` (ver `backend/.env.example`).
 
 ## Documentos (RAG privado)
 
@@ -73,8 +77,11 @@ O botão **＋** ao lado da mensagem envia PDF, MD ou TXT (até 20 MB), com duas
 - **Usar só nesta conversa** — guardado em `Temporarios\<id da conta>\<id da conversa>\`, consultado só ali
   e apagado junto com a conversa.
 
-A cada pergunta a busca roda sozinha nos documentos da conta (Biblioteca + temporários da conversa) e o
-nome do arquivo vai no contexto, para a resposta citar a fonte. "Alimentar a IA" é isso: indexar e
+A busca é **sob demanda**: é a ferramenta `buscar_documentos`, que o modelo aciona quando a pergunta cita
+um documento ("segundo a especificação…", "no PDF que enviei…", "na minha biblioteca…"). Conversa comum
+não consulta o índice. A ferramenta só é oferecida a contas que têm documentos, lista os nomes deles na
+própria descrição, busca na Biblioteca da conta + anexos da conversa e devolve os trechos com o nome do
+arquivo, para a resposta citar a fonte. O dono vem da sessão, nunca dos argumentos. "Alimentar a IA" é isso: indexar e
 recuperar — o modelo não é treinado nem modificado. Todo vetor no ChromaDB leva `owner_id` (e
 `conversation_id` nos temporários), e toda busca filtra por eles; vetores antigos sem dono não aparecem
 para ninguém até a migração entregá-los ao administrador.

@@ -780,15 +780,6 @@ async function sendMessage(text, controller) {
     } else if (event.type === "tool_result") {
       if (card) fillToolCard(card, event.ok, event.output);
       bubble = append(el("div", "msg assistant pending"));
-    } else if (event.type === "sources") {
-      // Documentos do próprio usuário que entraram no contexto desta resposta.
-      const note = el("div", "note", `Documentos consultados: ${event.documents.join(", ")}`);
-      messagesEl.insertBefore(note, bubble && bubble.parentNode === messagesEl ? bubble : null);
-      contentGrew();
-    } else if (event.type === "notice") {
-      const note = el("div", "note", event.message);
-      messagesEl.insertBefore(note, bubble && bubble.parentNode === messagesEl ? bubble : null);
-      contentGrew();
     } else if (event.type === "truncated") {
       flush();
       append(el("div", "note", "Resposta cortada pelo limite de tamanho. Envie \"continue\" para seguir."));

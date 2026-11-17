@@ -59,6 +59,8 @@ def load_settings() -> Settings:
     def get(key: str, default: str) -> str:
         return os.environ.get(key, file_values.get(key, default))
 
+    # Várias pastas separadas por ';'. A primeira é a pasta de trabalho (base dos
+    # caminhos relativos); as regras de acesso ficam em tools/sandbox.py.
     raw_roots = get("DISTOPIC_ALLOWED_ROOTS", str(DEFAULT_WORKSPACE))
     roots = tuple(Path(r.strip()).resolve() for r in raw_roots.split(";") if r.strip())
 

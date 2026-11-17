@@ -10,6 +10,7 @@ import httpx
 from . import confirmations, tools
 from .config import settings
 from .ollama_client import chat_stream
+from .tools.context import ToolContext
 from .tools.sandbox import ToolError
 
 MAX_STEPS = 5  # limite de idas e voltas modelo<->ferramentas por mensagem
@@ -70,7 +71,12 @@ def _unwrap_invented_tool(content: str) -> str | None:
 
 
 def _parse_text_tool_calls(content: str) -> list[dict]:
-    """Extrai chamadas escritas como JSON. Só aceita se TODO o texto for chamadas válidas."""
+    """Extrai chamadas escritas como JSON. Só aceita se TODO o texto for chamadas a
+    ferramentas registradas.
+
+    Reconhecer não é autorizar: a chamada segue para tools.prepare(), que recusa
+    com um erro claro o que a conta não pode usar (em vez de o JSON cru ir para a tela).
+    """
     text = _strip_wrappers(content)
     decoder = json.JSONDecoder()
     calls: list[dict] = []
@@ -88,16 +94,18 @@ def _parse_text_tool_calls(content: str) -> list[dict]:
 
 
 async def run(
-    client: httpx.AsyncClient, history: list[dict], *, allow_tools: bool = True
+    client: httpx.AsyncClient, history: list[dict], context: ToolContext | None = None
 ) -> AsyncIterator[dict]:
     """Produz eventos para o frontend:
     token, tool_call, confirm_request, tool_result, truncated, done, error.
 
-    `allow_tools=False` desliga o acesso aos arquivos do PC (contas não administradoras).
+    `context` diz de quem é o turno. Sem ele nenhuma ferramenta é oferecida nem executada.
     """
+    context = context or ToolContext()
     messages = trim_history(history)
-    # Sem permissão, o modelo nem fica sabendo que as ferramentas existem.
-    schemas = tools.ollama_schemas() if allow_tools else []
+    # O modelo só fica sabendo das ferramentas que esta conta pode usar; a
+    # permissão é conferida de novo na execução (tools.prepare / tools.run).
+    schemas = tools.ollama_schemas(context)
 
     for _ in range(MAX_STEPS):
         content = ""
@@ -118,10 +126,8 @@ async def run(
             calls.extend(message.get("tool_calls") or [])
             truncated = chunk.get("done_reason") == "length"
 
-        if not allow_tools:
-            calls = []  # qualquer chamada que ainda assim apareça é descartada
         if not calls and not streaming and content:
-            calls = _parse_text_tool_calls(content) if allow_tools else []
+            calls = _parse_text_tool_calls(content)
             if calls:
                 content = ""
             else:  # resposta embrulhada em ferramenta inventada, ou texto que só parecia JSON
@@ -141,7 +147,7 @@ async def run(
             yield {"type": "tool_call", "name": name, "args": arguments}
 
             confirmed: bool | None = None  # decisão do usuário, se foi consultado
-            prepared = tools.prepare(name, arguments)
+            prepared = tools.prepare(name, arguments, context)
             if isinstance(prepared, tools.ToolResult):
                 result = prepared
             else:
@@ -170,7 +176,7 @@ async def run(
                                 "O usuário não autorizou esta ação. Não tente de novo sem que ele peça.",
                             )
                 if result is None:
-                    result = await tools.run(tool, args, approved=approved)
+                    result = await tools.run(tool, args, context, approved=approved)
 
             event = {"type": "tool_result", "name": name, "ok": result.ok, "output": result.output}
             if confirmed is not None:

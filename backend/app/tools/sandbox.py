@@ -28,6 +28,44 @@ def is_sensitive(relative: Path) -> bool:
     return name.startswith(".env") or relative.suffix.lower() in _DENIED_SUFFIXES
 
 
+def _locate(raw: str, roots: tuple[Path, ...]) -> Path:
+    """Transforma o caminho pedido pelo modelo em um candidato (ainda NÃO validado).
+
+    - Caminho completo (C:\\..., \\\\servidor\\...): usado como veio.
+    - "/src/App.java" ou "\\src\\App.java": no Windows isso apontaria para a raiz do
+      disco; o modelo quer dizer "dentro da pasta de trabalho", então a barra inicial sai.
+    - "Projetos/app/x.py", sendo "Projetos" o nome de uma pasta permitida: vai para ela.
+      É assim que um caminho relativo alcança as outras pastas de DISTOPIC_ALLOWED_ROOTS
+      (e "workspace/x" não vira workspace/workspace/x).
+    - Qualquer outro relativo parte da primeira pasta permitida.
+
+    A segurança não depende daqui: resolve_path() valida o resultado em seguida.
+    """
+    path = Path(raw.replace("\\", "/"))
+    if path.is_absolute():
+        return path
+    if path.drive:  # "C:arquivo" (relativo ao disco): ambíguo, recusado
+        raise ToolError("Caminho inválido.")
+    parts = [part for part in path.parts if part not in ("/", "\\")]
+    if parts and parts[0] not in (".", ".."):
+        for root in roots:
+            if root.name and root.name.casefold() == parts[0].casefold():
+                return root.joinpath(*parts[1:])
+    return roots[0].joinpath(*parts)
+
+
+def roots_hint(roots: tuple[Path, ...] | None = None) -> str:
+    """Frase para a descrição das ferramentas: onde o modelo pode ler e criar arquivos."""
+    roots = settings.allowed_roots if roots is None else roots
+    if not roots:
+        return "Nenhuma pasta está liberada."
+    hint = f"Caminhos relativos partem da pasta de trabalho: {roots[0]}."
+    if len(roots) > 1:
+        others = "; ".join(str(root) for root in roots[1:])
+        hint += f" Outras pastas permitidas (use o caminho completo ou comece pelo nome da pasta): {others}."
+    return hint
+
+
 def resolve_path(raw: str, roots: tuple[Path, ...] | None = None) -> Path:
     roots = settings.allowed_roots if roots is None else roots
     if not roots:
@@ -35,9 +73,7 @@ def resolve_path(raw: str, roots: tuple[Path, ...] | None = None) -> Path:
     if "\x00" in raw:
         raise ToolError("Caminho inválido.")
 
-    candidate = Path(raw.strip() or ".")
-    if not candidate.is_absolute():
-        candidate = roots[0] / candidate
+    candidate = _locate(raw.strip() or ".", roots)
     try:
         resolved = candidate.resolve()
     except OSError as exc:

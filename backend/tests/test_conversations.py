@@ -13,6 +13,10 @@ storage.init()
 USER = storage.create_user("conversas", "sem-senha", is_admin=True)
 UID = USER["id"]
 
+from app.tools.context import ToolContext  # noqa: E402
+
+ADMIN_CTX = ToolContext(user_id=UID, is_admin=True)
+
 
 def fake_ollama(script):
     """Transporte simulado: cada requisição recebe o próximo item do roteiro."""
@@ -179,7 +183,7 @@ class SpeedTest(unittest.TestCase):
 
         async def go():
             async with httpx.AsyncClient(transport=transport) as client:
-                return [e["type"] async for e in agent.run(client, [{"role": "user", "content": "oi"}])]
+                return [e["type"] async for e in agent.run(client, [{"role": "user", "content": "oi"}], ADMIN_CTX)]
 
         self.assertEqual(asyncio.run(go()), ["token", "truncated", "done"])
         self.assertEqual(requests[0]["options"]["num_predict"], settings.num_predict)
@@ -195,7 +199,7 @@ class TextToolCallTest(unittest.TestCase):
 
         async def go():
             async with httpx.AsyncClient(transport=transport) as client:
-                return [e async for e in agent.run(client, [{"role": "user", "content": "x"}])]
+                return [e async for e in agent.run(client, [{"role": "user", "content": "x"}], ADMIN_CTX)]
 
         return asyncio.run(go()), requests
 
