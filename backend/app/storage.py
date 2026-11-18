@@ -18,7 +18,7 @@ from contextlib import contextmanager
 
 from .config import settings
 
-DB_PATH = settings.data_dir / "distopic.db"
+DB_PATH = settings.data_dir / "distopia.db"
 SCHEMA_VERSION = 2
 TITLE_MAX = 60
 

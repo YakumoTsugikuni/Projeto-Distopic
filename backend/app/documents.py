@@ -20,7 +20,7 @@ from . import storage
 from .config import settings
 from .rag import indexer
 
-log = logging.getLogger("distopic.documents")
+log = logging.getLogger("distopia.documents")
 
 LIBRARY_DIR = settings.data_dir / "Biblioteca"
 TEMP_DIR = settings.data_dir / "Temporarios"

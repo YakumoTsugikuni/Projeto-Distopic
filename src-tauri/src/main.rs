@@ -1,4 +1,4 @@
-//! Casca desktop da Distopic.
+//! Casca desktop da Distopia.
 //!
 //! Abre uma janela com a tela de carregamento, inicia o backend Python como
 //! processo filho e, quando ele responde, navega para a interface servida por
@@ -26,7 +26,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 struct Backend(Mutex<Option<Child>>);
 
 fn main() {
-    let port = std::env::var("DISTOPIC_PORT")
+    let port = std::env::var("DISTOPIA_PORT")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(DEFAULT_PORT);
@@ -49,7 +49,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("falha ao iniciar o Distopic");
+        .expect("falha ao iniciar o Distopia");
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
@@ -70,7 +70,7 @@ fn start_backend(app: AppHandle, mut window: WebviewWindow, port: u16) {
         return fail(
             &window,
             format!(
-                "A porta {port} já está em uso. Feche o servidor da Distopic que está aberto \
+                "A porta {port} já está em uso. Feche o servidor da Distopia que está aberto \
                  em outro terminal (ou outro programa nessa porta) e abra o aplicativo de novo."
             ),
         );
@@ -112,7 +112,7 @@ fn start_backend(app: AppHandle, mut window: WebviewWindow, port: u16) {
 
 /// Pasta do backend no projeto, usada em desenvolvimento (`cargo run`).
 fn backend_dir() -> PathBuf {
-    std::env::var_os("DISTOPIC_BACKEND_DIR")
+    std::env::var_os("DISTOPIA_BACKEND_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -124,12 +124,12 @@ fn log_path() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    base.join("Distopic").join("backend.log")
+    base.join("Distopia").join("backend.log")
 }
 
 /// Backend empacotado, instalado ao lado do executável do aplicativo.
 fn bundled_backend() -> Option<PathBuf> {
-    let path = std::env::current_exe().ok()?.parent()?.join("distopic-backend.exe");
+    let path = std::env::current_exe().ok()?.parent()?.join("distopia-backend.exe");
     path.is_file().then_some(path)
 }
 
@@ -160,10 +160,10 @@ fn spawn_backend(port: u16) -> std::io::Result<Child> {
     let stderr = stdout.try_clone()?;
 
     command
-        .env("DISTOPIC_PORT", port.to_string())
+        .env("DISTOPIA_PORT", port.to_string())
         // O backend se encerra sozinho quando este processo deixa de existir,
         // mesmo que o aplicativo trave ou seja finalizado à força.
-        .env("DISTOPIC_PARENT_PID", std::process::id().to_string())
+        .env("DISTOPIA_PARENT_PID", std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)

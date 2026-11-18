@@ -347,7 +347,7 @@ function resetChat() {
   logo.src = "assets/logo.png";
   logo.alt = "";
   logo.width = logo.height = 96;
-  welcome.append(logo, "Distopic online. O que deseja?");
+  welcome.append(logo, "Distopia online. O que deseja?");
   messagesEl.replaceChildren(welcome);
   toBottom();
   renderConversations();
@@ -722,7 +722,7 @@ function addConfirmCard(event) {
 
   actions.append(deny, allow, status);
   card.append(
-    el("strong", "", `A Distopic quer executar: ${event.name}`),
+    el("strong", "", `A Distopia quer executar: ${event.name}`),
     el("p", "", event.summary),
     el("pre", "", event.detail),
     actions

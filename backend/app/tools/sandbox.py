@@ -2,7 +2,7 @@
 
 O modelo nunca recebe acesso direto ao disco. Um caminho só é aceito se, depois
 de resolvidos `..` e links simbólicos, ficar dentro de uma raiz permitida
-(DISTOPIC_ALLOWED_ROOTS) e não tocar em nada sensível.
+(DISTOPIA_ALLOWED_ROOTS) e não tocar em nada sensível.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def _locate(raw: str, roots: tuple[Path, ...]) -> Path:
     - "/src/App.java" ou "\\src\\App.java": no Windows isso apontaria para a raiz do
       disco; o modelo quer dizer "dentro da pasta de trabalho", então a barra inicial sai.
     - "Projetos/app/x.py", sendo "Projetos" o nome de uma pasta permitida: vai para ela.
-      É assim que um caminho relativo alcança as outras pastas de DISTOPIC_ALLOWED_ROOTS
+      É assim que um caminho relativo alcança as outras pastas de DISTOPIA_ALLOWED_ROOTS
       (e "workspace/x" não vira workspace/workspace/x).
     - Qualquer outro relativo parte da primeira pasta permitida.
 

@@ -119,7 +119,7 @@ class AccountManagementTest(AccountsCase):
         import tempfile
 
         saved = (storage.DB_PATH, auth._legacy_hash)
-        storage.DB_PATH = Path(tempfile.mkdtemp(prefix="distopic_test_setup_")) / "novo.db"
+        storage.DB_PATH = Path(tempfile.mkdtemp(prefix="distopia_test_setup_")) / "novo.db"
         auth._legacy_hash = ""
         try:
             with TestClient(app, client=("192.168.0.50", 50000)) as lan:
@@ -433,7 +433,7 @@ class LegacyMigrationTest(unittest.TestCase):
         import tempfile
 
         saved = storage.DB_PATH
-        storage.DB_PATH = Path(tempfile.mkdtemp(prefix="distopic_test_v1_")) / "v1.db"
+        storage.DB_PATH = Path(tempfile.mkdtemp(prefix="distopia_test_v1_")) / "v1.db"
         try:
             conn = sqlite3.connect(storage.DB_PATH)
             conn.executescript(storage._SCHEMA_V1 + "PRAGMA user_version = 1;")

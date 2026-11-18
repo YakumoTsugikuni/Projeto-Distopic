@@ -14,7 +14,7 @@ from ..rag.retriever import format_context, search_docs
 from .context import ToolContext
 from .sandbox import ToolError
 
-log = logging.getLogger("distopic.tools")
+log = logging.getLogger("distopia.tools")
 
 TOP_K = 4
 

@@ -295,8 +295,8 @@ class NestedPathsTest(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        work = Path(tempfile.mkdtemp(prefix="distopic_raiz_a_")).resolve()
-        projects = Path(tempfile.mkdtemp(prefix="distopic_raiz_b_")).resolve()
+        work = Path(tempfile.mkdtemp(prefix="distopia_raiz_a_")).resolve()
+        projects = Path(tempfile.mkdtemp(prefix="distopia_raiz_b_")).resolve()
         roots = (work, projects)
 
         self.assertEqual(resolve_path("src/App.java", roots), work / "src" / "App.java")

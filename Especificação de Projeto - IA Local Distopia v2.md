@@ -1,4 +1,4 @@
-# Especificação Técnica do Projeto: Assistente de IA Local "Distopic" — v2
+# Especificação Técnica do Projeto: Assistente de IA Local "Distopia" — v2
 
 Esta versão substitui a v1 (PDF). Ela registra o que já foi construído e acrescenta três frentes:
 **aplicativo desktop nativo (Tauri)**, **persistência de conversas** e **refinamentos de UI e de personalidade**.
@@ -9,7 +9,7 @@ Legenda de estado: ✅ pronto · 🔶 parcial · ⬜ a fazer
 
 ## 1. Visão geral
 
-A Distopic é uma IA 100% local, hospedada no PC do usuário, sem APIs pagas e com total privacidade.
+A Distopia é uma IA 100% local, hospedada no PC do usuário, sem APIs pagas e com total privacidade.
 Ela conversa, age como agente sobre arquivos e aplicativos do computador e pode ser acessada de três formas,
 todas servidas pelo **mesmo backend**:
 
@@ -27,7 +27,7 @@ todas servidas pelo **mesmo backend**:
 | SO | Windows 11 |
 
 - Modelo base: `qwen2.5-coder:7b` (Q4_K_M, ~4,7 GB) com contexto de 8192 tokens, 100% na GPU.
-- **Orçamento de VRAM (regra da v2):** a VRAM pertence ao modelo. Nenhum outro componente da Distopic
+- **Orçamento de VRAM (regra da v2):** a VRAM pertence ao modelo. Nenhum outro componente da Distopia
   (janela desktop, persistência, interface) pode provocar o transbordo do modelo para a RAM.
   Critério de verificação: com o aplicativo aberto e uma conversa em andamento, `ollama ps` continua mostrando `100% GPU`.
 
@@ -35,7 +35,7 @@ todas servidas pelo **mesmo backend**:
 
 | Camada | Tecnologia | Estado |
 |---|---|---|
-| Inferência | Ollama (`localhost:11434`), modelo customizado `distopic` via `Modelfile` | ✅ |
+| Inferência | Ollama (`localhost:11434`), modelo customizado `distopia` via `Modelfile` | ✅ |
 | Backend | Python + FastAPI (`backend/`), streaming NDJSON | ✅ |
 | Frontend | HTML/CSS/JS puro (`frontend/`), sem etapa de build | ✅ |
 | Persistência | SQLite (módulo `sqlite3` da biblioteca padrão) | ✅ |
@@ -44,7 +44,7 @@ todas servidas pelo **mesmo backend**:
 ## 4. Requisitos funcionais
 
 ### 4.1 Identidade e personalidade 🔶
-- ✅ Modelo `distopic` com temperatura 0.3 e prompt de sistema orientado a ferramentas.
+- ✅ Modelo `distopia` com temperatura 0.3 e prompt de sistema orientado a ferramentas.
 - ✅ **Personalidade no estilo J.A.R.V.I.S.**, pré-aquecimento e teto de resposta — ver seção 8.
 - Medido com o modelo real (RX 7600): `100% GPU`, 5,1 GB de VRAM, primeiro token em ~0,1 s em conversa
   e ~1–2 s quando há ferramenta.
@@ -55,7 +55,7 @@ todas servidas pelo **mesmo backend**:
 ### 4.2 Agente / Function Calling 🔶
 - ✅ `listar_diretorio`, `ler_arquivo` (leitura, sem confirmação).
 - ✅ `criar_arquivo` (escrita, com confirmação do usuário na interface).
-- ✅ Confinamento a pastas permitidas (`DISTOPIC_ALLOWED_ROOTS`) e bloqueio de arquivos sensíveis.
+- ✅ Confinamento a pastas permitidas (`DISTOPIA_ALLOWED_ROOTS`) e bloqueio de arquivos sensíveis.
 - ⬜ `abrir_aplicativo`, edição parcial de arquivos, mover/renomear/apagar, execução de comandos.
 
 ### 4.3 RAG local ⬜
@@ -80,7 +80,7 @@ todas servidas pelo **mesmo backend**:
 ### 5.1 Arquitetura
 
 ```
-┌────────────────────── Distopic.exe (Tauri v2) ──────────────────────┐
+┌────────────────────── Distopia.exe (Tauri v2) ──────────────────────┐
 │  Janela WebView2  ──HTTP──►  Backend FastAPI (processo filho)       │
 │  carrega http://127.0.0.1:<porta>      │                            │
 │                                         ├──► Ollama (localhost:11434)│
@@ -105,7 +105,7 @@ todas servidas pelo **mesmo backend**:
   O login automático por token (versão anterior desta seção) foi removido.
 - **Primeiro acesso:** se não há senha definida, a tela de entrada vira "criar senha". Isso só é aceito
   em conexão direta de `127.0.0.1` sem cabeçalhos de proxy — nunca pela rede local nem pelo túnel.
-- O aplicativo instalado guarda a senha (hash scrypt) em `%LOCALAPPDATA%\Distopic\.env`, separado do
+- O aplicativo instalado guarda a senha (hash scrypt) em `%LOCALAPPDATA%\Distopia\.env`, separado do
   `backend\.env` usado em desenvolvimento.
 
 ### 5.3 Uso de GPU pela janela
@@ -116,7 +116,7 @@ todas servidas pelo **mesmo backend**:
   do WebView2 nas opções da janela e medir de novo.
 
 ### 5.4 Logo e ícones
-- Arquivo de origem: `frontend/Logo/logo distopic.jpg` (512×512, JPEG).
+- Arquivo de origem: `frontend/Logo/logo distopia.jpg` (512×512, JPEG).
 - **Estado real do arquivo:** emblema **preto com detalhes brancos sobre fundo branco**; não há vermelho,
   não há transparência e o emblema ocupa só ~30% da área.
 - Tratamento exigido antes de gerar os ícones:
@@ -152,8 +152,8 @@ todas servidas pelo **mesmo backend**:
 - **Local e privado:** tudo em um único arquivo SQLite; nada sai do PC.
 - **Só CPU e disco:** salvar, listar e abrir conversas nunca chama o modelo. Em particular, o **título da
   conversa é derivado da primeira mensagem do usuário** (primeiros ~60 caracteres), não gerado pela IA.
-- **Fora do OneDrive:** o banco fica em `%LOCALAPPDATA%\Distopic\distopic.db` (configurável por
-  `DISTOPIC_DATA_DIR`). O projeto está numa pasta sincronizada pelo OneDrive, e sincronizar um SQLite em uso
+- **Fora do OneDrive:** o banco fica em `%LOCALAPPDATA%\Distopia\distopia.db` (configurável por
+  `DISTOPIA_DATA_DIR`). O projeto está numa pasta sincronizada pelo OneDrive, e sincronizar um SQLite em uso
   causa conflitos e corrupção.
 - **O servidor é a fonte do histórico.** O cliente deixa de enviar a conversa inteira a cada mensagem: envia
   `conversation_id` + a nova mensagem, e o backend monta o contexto a partir do banco. Isso também impede um
@@ -260,7 +260,7 @@ A interface é cinza neutro. Preto, branco e vermelho vêm da logo e aparecem s�
 - **Age em vez de perguntar:** se uma ferramenta resolve, chama a ferramenta. Relata o resultado em uma linha.
 - Assertiva: aponta erros e riscos sem rodeios e sugere o próximo passo.
 - "Agressiva" refere-se a ritmo e objetividade — nunca a grosseria com o usuário.
-- Não se apresenta como J.A.R.V.I.S. nem cita o personagem: o nome é Distopic.
+- Não se apresenta como J.A.R.V.I.S. nem cita o personagem: o nome é Distopia.
 
 ### 8.2 Velocidade percebida
 - **Pré-aquecimento:** ao iniciar o backend, carregar o modelo na VRAM em segundo plano, para a primeira
@@ -293,7 +293,7 @@ e pare para aprovação do usuário. Mantenha `README.md` atualizado.
 3. **Logo (seção 5.4).** Tratar o arquivo de origem, perguntar ao usuário sobre o vermelho, gerar
    `logo.png`, favicon e ícones. Não sobrescrever o arquivo original.
 4. **Personalidade e velocidade (seção 8).** Reescrever o `SYSTEM` do `Modelfile`, adicionar o
-   pré-aquecimento e o botão Parar. Lembrar o usuário de rodar `ollama create distopic -f Modelfile`.
+   pré-aquecimento e o botão Parar. Lembrar o usuário de rodar `ollama create distopia -f Modelfile`.
 5. **Tauri (seção 5).** Verificar Rust e Build Tools (orientar a instalação se faltarem); criar `src-tauri/`
    com Tauri v2; tela de carregamento; iniciar/encerrar o backend; token de sessão local; instância única;
    ícones; depois o empacotamento do backend como sidecar e o instalador. Consultar a documentação atual do

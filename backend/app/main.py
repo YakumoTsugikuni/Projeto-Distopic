@@ -1,4 +1,4 @@
-"""Servidor da Distopic: API autenticada + frontend estático."""
+"""Servidor da Distopia: API autenticada + frontend estático."""
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +19,7 @@ from .chat import run_turn
 from .config import FRONTEND_DIR, settings
 from .ollama_client import OllamaError
 
-log = logging.getLogger("distopic")
+log = logging.getLogger("distopia")
 
 # Nomes mantidos por compatibilidade; a regra vive em documents.py.
 DOCS_DIR = documents.LIBRARY_DIR
@@ -56,7 +56,7 @@ async def _prewarm(client: httpx.AsyncClient) -> None:
 
 
 # Documentação automática desligada: o servidor fica exposto à internet.
-app = FastAPI(title="Distopic", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Distopia", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.middleware("http")

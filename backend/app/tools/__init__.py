@@ -26,7 +26,7 @@ from . import buscar_documentos, criar_arquivo, ler_arquivo, listar_diretorio, s
 from .context import ToolContext
 from .sandbox import ToolError
 
-log = logging.getLogger("distopic.tools")
+log = logging.getLogger("distopia.tools")
 
 MAX_OUTPUT_CHARS = 6000
 MAX_LISTED_DOCUMENTS = 20
@@ -111,7 +111,7 @@ TOOLS: dict[str, Tool] = {
         Tool(
             name="buscar_documentos",
             description=(
-                "Busca trechos nos documentos que o usuário enviou para a Distopic (a Biblioteca dele "
+                "Busca trechos nos documentos que o usuário enviou para a Distopia (a Biblioteca dele "
                 "e os anexos desta conversa). Use SOMENTE quando a pergunta citar explicitamente um "
                 "arquivo, PDF, especificação, contrato, manual, anexo ou 'meus documentos' / 'minha "
                 "biblioteca'. NÃO use para conhecimento geral, programação ou conversa, nem para "

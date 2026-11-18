@@ -10,7 +10,7 @@ import httpx
 from . import agent, storage
 from .tools.context import ToolContext
 
-log = logging.getLogger("distopic.chat")
+log = logging.getLogger("distopia.chat")
 
 
 async def run_turn(client: httpx.AsyncClient, conversation_id: str, user: dict) -> AsyncIterator[dict]:

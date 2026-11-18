@@ -1,4 +1,4 @@
-# Distopic
+# Distopia
 
 Assistente de IA 100% local (Ollama + FastAPI + frontend web próprio).
 
@@ -6,7 +6,7 @@ Assistente de IA 100% local (Ollama + FastAPI + frontend web próprio).
 
 ```
 backend/
-  Modelfile              modelo customizado `distopic` (qwen2.5-coder:7b)
+  Modelfile              modelo customizado `distopia` (qwen2.5-coder:7b)
   requirements.txt
   .env.example           configuração (copie para .env)
   app/
@@ -26,7 +26,7 @@ backend/
       buscar_documentos.py (leitura — RAG sob demanda nos documentos da conta)
       context.py           conta e conversa do turno (ToolContext)
     confirmations.py     pedidos de confirmação pendentes (POST /api/confirm)
-    storage.py           contas, conversas e registro de documentos em SQLite (%LOCALAPPDATA%\Distopic\distopic.db)
+    storage.py           contas, conversas e registro de documentos em SQLite (%LOCALAPPDATA%\Distopia\distopia.db)
     chat.py              um turno: contexto do banco + RAG -> agente -> gravação
     documents.py         upload: arquivo em disco + registro + vetores; remoção; migração dos antigos
     rag/                 embeddings (Ollama), indexação e busca no ChromaDB, sempre filtradas por dono
@@ -38,14 +38,14 @@ src-tauri/               aplicativo desktop (Tauri v2)
   shell/                 tela de carregamento local
   icons/                 ícones gerados a partir de frontend/assets/logo-1024.png
   tauri.conf.json
-workspace/               pasta de trabalho padrão da Distopic (criada ao iniciar)
+workspace/               pasta de trabalho padrão da Distopia (criada ao iniciar)
 ```
 
 ## Primeira execução (PowerShell, dentro de `backend/`)
 
 ```powershell
 ollama pull qwen2.5-coder:7b
-ollama create distopic -f Modelfile
+ollama create distopia -f Modelfile
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m app
@@ -66,7 +66,7 @@ Também é preciso o modelo de embeddings do RAG: `ollama pull nomic-embed-text`
 - As ferramentas de arquivos do PC (`listar_diretorio`, `ler_arquivo`, `criar_arquivo`) são exclusivas de
   administradores: não são oferecidas ao modelo em contas comuns e, se ele as chamar mesmo assim, a
   execução recusa com um erro claro. `criar_arquivo` cria as pastas do caminho que faltarem.
-- Pastas liberadas: `DISTOPIC_ALLOWED_ROOTS` aceita várias, separadas por `;` (ver `backend/.env.example`).
+- Pastas liberadas: `DISTOPIA_ALLOWED_ROOTS` aceita várias, separadas por `;` (ver `backend/.env.example`).
 
 ## Documentos (RAG privado)
 
@@ -102,8 +102,8 @@ cargo run
   e o encerra ao fechar.
 - Pede a senha a cada abertura, como no navegador. No primeiro acesso (sem senha definida) a tela de
   entrada pede para criar a senha; isso só é possível a partir do próprio PC, nunca pela rede ou túnel.
-- Log do backend: `%LOCALAPPDATA%\Distopic\backend.log`.
-- Os arquivos de compilação ficam em `%LOCALAPPDATA%\Distopic\build` (fora do OneDrive); o caminho está
+- Log do backend: `%LOCALAPPDATA%\Distopia\backend.log`.
+- Os arquivos de compilação ficam em `%LOCALAPPDATA%\Distopia\build` (fora do OneDrive); o caminho está
   em `src-tauri/.cargo/config.toml`.
 - `cargo run` usa o backend e a `.venv` desta pasta do projeto.
 
@@ -115,16 +115,16 @@ Na raiz do projeto:
 powershell -ExecutionPolicy Bypass -File build-desktop.ps1
 ```
 
-Gera o instalador em `%LOCALAPPDATA%\Distopic\build\release\bundle\nsis\`. O aplicativo instalado é
+Gera o instalador em `%LOCALAPPDATA%\Distopia\build\release\bundle\nsis\`. O aplicativo instalado é
 independente da pasta do projeto e guarda a configuração (incluindo a senha, criada no primeiro
-acesso) em `%LOCALAPPDATA%\Distopic\.env` — ele **não** lê o `backend\.env`. A pasta de trabalho
-padrão dele é `%USERPROFILE%\Distopic`. Para trocar a senha depois:
-`distopic-backend.exe set-password` na pasta de instalação.
+acesso) em `%LOCALAPPDATA%\Distopia\.env` — ele **não** lê o `backend\.env`. A pasta de trabalho
+padrão dele é `%USERPROFILE%\Distopia`. Para trocar a senha depois:
+`distopia-backend.exe set-password` na pasta de instalação.
 
 ## Acesso remoto
 
 - **Cloudflare Tunnel:** `cloudflared tunnel --url http://localhost:8000` (o servidor pode continuar em `127.0.0.1`).
-- **Rede local:** defina `DISTOPIC_HOST=0.0.0.0` no `.env`. Pela LAN o tráfego é HTTP sem criptografia.
+- **Rede local:** defina `DISTOPIA_HOST=0.0.0.0` no `.env`. Pela LAN o tráfego é HTTP sem criptografia.
 
 ## Adicionando uma ferramenta
 
@@ -134,4 +134,4 @@ padrão dele é `%USERPROFILE%\Distopic`. Para trocar a senha depois:
    só rodam depois que o usuário clica em Autorizar na interface; forneça um `describe(args)`
    que diga exatamente o que será feito.
 
-Depois de alterar o `Modelfile`, rode `ollama create distopic -f Modelfile` de novo.
+Depois de alterar o `Modelfile`, rode `ollama create distopia -f Modelfile` de novo.
