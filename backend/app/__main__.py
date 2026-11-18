@@ -33,7 +33,7 @@ def main() -> None:
 
         return set_password(sys.argv[2:])
 
-    parent = os.environ.get("DISTOPIC_PARENT_PID", "")
+    parent = os.environ.get("DISTOPIA_PARENT_PID", "")
     if parent.isdigit() and os.name == "nt":
         threading.Thread(target=_exit_with_parent, args=(int(parent),), daemon=True).start()
 

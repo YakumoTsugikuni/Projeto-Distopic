@@ -1,7 +1,7 @@
 [package]
-name = "distopic"
+name = "distopia"
 version = "0.1.0"
-description = "Distopic - assistente de IA local"
+description = "Distopia - assistente de IA local"
 edition = "2021"
 
 [build-dependencies]

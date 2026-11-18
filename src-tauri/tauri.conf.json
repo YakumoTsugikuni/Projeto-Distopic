@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Distopic",
+  "productName": "Distopia",
   "version": "0.1.0",
-  "identifier": "com.distopic.desktop",
+  "identifier": "com.distopia.desktop",
   "build": {
     "frontendDist": "./shell"
   },
@@ -10,7 +10,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Distopic",
+        "title": "Distopia",
         "width": 1200,
         "height": 800,
         "minWidth": 420,
@@ -25,7 +25,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "externalBin": ["binaries/distopic-backend"],
+    "externalBin": ["binaries/distopia-backend"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

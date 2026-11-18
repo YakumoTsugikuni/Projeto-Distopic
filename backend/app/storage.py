@@ -18,7 +18,7 @@ from contextlib import contextmanager
 
 from .config import settings
 
-DB_PATH = settings.data_dir / "distopic.db"
+DB_PATH = settings.data_dir / "distopia.db"
 SCHEMA_VERSION = 2
 TITLE_MAX = 60
 
@@ -338,14 +338,18 @@ def find_documents(user_id: str, filename: str, conversation_id: str | None) -> 
     return [dict(r) for r in rows]
 
 
-def has_documents(user_id: str, conversation_id: str | None) -> bool:
-    """Há algo a buscar para este usuário nesta conversa (Biblioteca ou temporários)?"""
+def document_names(user_id: str, conversation_id: str | None, limit: int = 50) -> list[str]:
+    """Nomes dos documentos que este usuário pode buscar nesta conversa.
+
+    Anexos da conversa primeiro, depois a Biblioteca, do mais recente ao mais antigo.
+    """
     with _db() as db:
-        row = db.execute(
-            "SELECT 1 FROM documents WHERE user_id = ? AND (conversation_id IS NULL OR conversation_id = ?) LIMIT 1",
-            (user_id, conversation_id),
-        ).fetchone()
-    return row is not None
+        rows = db.execute(
+            "SELECT filename FROM documents WHERE user_id = ? AND (conversation_id IS NULL OR conversation_id = ?) "
+            "ORDER BY conversation_id IS NULL, created_at DESC LIMIT ?",
+            (user_id, conversation_id, limit),
+        ).fetchall()
+    return [row["filename"] for row in rows]
 
 
 def delete_document(doc_id: str, user_id: str) -> bool:

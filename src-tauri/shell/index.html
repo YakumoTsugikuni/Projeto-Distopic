@@ -2,18 +2,41 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Distopic</title>
+  <title>Distopia</title>
   <style>
+    /* Mesmos tokens da interface principal (frontend/style.css). */
+    :root {
+      --c-bg: #101113; --c-surface: #17181b; --c-border: #292b30; --c-border-strong: #393c42;
+      --c-text: #e5e2df; --c-muted: #92949a; --c-faint: #6b6e75; --c-white: #f6f4f2;
+      --c-red: #a92332; --c-red-hi: #e04450; --c-red-text: #f0727b;
+      --f-ui: "Bahnschrift", "DIN Alternate", "Segoe UI", system-ui, sans-serif;
+      --f-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+      color-scheme: dark;
+    }
     html, body { height: 100%; margin: 0; }
     body {
-      background: #1b1c1e; color: #e6e6e8; font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--c-bg); color: var(--c-text); font-family: var(--f-ui);
       display: grid; place-items: center; text-align: center; user-select: none;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, 0.022) 39px 40px),
+        repeating-linear-gradient(90deg, transparent 0 39px, rgba(255, 255, 255, 0.022) 39px 40px);
     }
-    h1 { margin: 0.8rem 0 0.3rem; letter-spacing: 0.35em; font-size: 1.5rem; color: #fff; }
-    #status { color: #9a9ba1; font-size: 0.9rem; }
-    #status.error { color: #ff8088; max-width: 520px; line-height: 1.5; user-select: text; }
-    .dot { display: inline-block; width: 8px; height: 8px; margin-right: 0.4rem; border-radius: 50%; background: #d4252f; animation: pulse 1s ease-in-out infinite; }
-    @keyframes pulse { 50% { opacity: 0.25; } }
+    main { display: grid; justify-items: center; gap: 14px; animation: rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+    img { display: block; }
+    h1 { margin: 6px 0 0; padding-left: 0.32em; letter-spacing: 0.32em; font-size: 1.5rem; font-weight: 600; color: var(--c-white); }
+    #status { margin: 0; font-family: var(--f-mono); font-size: 0.75rem; color: var(--c-muted); display: inline-flex; align-items: center; gap: 8px; }
+    #status.error {
+      display: block; max-width: 520px; padding: 12px 16px; line-height: 1.6; text-align: left; user-select: text;
+      color: var(--c-red-text); background: rgba(224, 68, 80, 0.08); border: 1px solid rgba(224, 68, 80, 0.4); border-left: 2px solid var(--c-red-hi);
+    }
+    .dot { width: 8px; height: 8px; background: var(--c-red-hi); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); animation: blink 0.9s steps(2) infinite; }
+    /* trilho de varredura enquanto o backend sobe */
+    .track { width: 180px; height: 2px; background: linear-gradient(90deg, transparent, var(--c-red-hi), transparent) no-repeat, var(--c-border); background-size: 40% 100%, 100% 100%; animation: scan 1.2s cubic-bezier(0.7, 0, 0.2, 1) infinite; }
+    #status.error + .track { display: none; }
+    @keyframes blink { 50% { opacity: 0.25; } }
+    @keyframes scan { from { background-position: -100% 0, 0 0; } to { background-position: 200% 0, 0 0; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
   <script>
     // Chamado pelo aplicativo (Rust) se o backend não subir.
@@ -26,9 +49,10 @@
 </head>
 <body>
   <main>
-    <img src="logo.png" alt="" width="128" height="128">
-    <h1>DISTOPIC</h1>
+    <img src="logo.png" alt="" width="112" height="112">
+    <h1>DISTOPIA</h1>
     <p id="status"><span class="dot"></span>Iniciando sistemas…</p>
+    <div class="track" aria-hidden="true"></div>
   </main>
 </body>
 </html>

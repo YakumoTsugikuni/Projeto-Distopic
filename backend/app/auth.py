@@ -21,9 +21,9 @@ from fastapi import Depends, HTTPException, Request, Response
 from . import documents, storage
 from .config import settings
 
-log = logging.getLogger("distopic.auth")
+log = logging.getLogger("distopia.auth")
 
-COOKIE_NAME = "distopic_session"
+COOKIE_NAME = "distopia_session"
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 1
 _SCRYPT_MAXMEM = 2**26
 
@@ -31,7 +31,7 @@ MIN_PASSWORD_LENGTH = 12
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 USERNAME_RULE = "O nome de usuário deve ter de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado."
 
-# Antes das contas havia uma única senha compartilhada (DISTOPIC_PASSWORD_HASH).
+# Antes das contas havia uma única senha compartilhada (DISTOPIA_PASSWORD_HASH).
 # Quem a usava continua entrando: na primeira execução ela vira a senha da
 # conta administradora com este nome.
 LEGACY_USERNAME = "admin"

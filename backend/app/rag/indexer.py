@@ -20,7 +20,7 @@ from ..config import settings
 # Caminho de persistência do ChromaDB no SSD
 CHROMA_PATH = settings.data_dir / "vector_db"
 chroma_client = chromadb.PersistentClient(path=str(CHROMA_PATH))
-collection = chroma_client.get_or_create_collection(name="distopic_docs")
+collection = chroma_client.get_or_create_collection(name="distopia_docs")
 
 SCOPE_LIBRARY = "library"
 SCOPE_CONVERSATION = "conversation"
